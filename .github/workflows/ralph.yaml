@@ -22,6 +22,11 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Install Playwright and dependencies
+        run: |
+          npm install --no-save playwright
+          npx playwright install chromium --with-deps
+
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
 

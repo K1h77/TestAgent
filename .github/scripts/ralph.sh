@@ -19,6 +19,7 @@ echo "🤖 [RALPH] Waking up. Target: Issue #$ISSUE_NUMBER in $REPO"
 
 # Ensure we are in the root of the repo
 cd "$(git rev-parse --show-toplevel)"
+REPO_ROOT="$(pwd)"
 
 # ==========================================
 # HELPER FUNCTION: Post Issue Comment
@@ -70,6 +71,11 @@ PROMPT_PLAN="I am an autonomous agent working on GitHub Issue #$ISSUE_NUMBER in 
 3. Create a detailed step-by-step plan (as a markdown checklist) to solve the issue.
 4. Output ONLY the plan in markdown format, starting with '## Plan' as the heading.
 
+IMPORTANT: You have access to Playwright for browser automation and visual testing.
+- For any UI, styling, or visual tasks, your plan should include steps to use Playwright to verify the changes.
+- You can run '.github/scripts/playwright-screenshot.sh' to start the app, take screenshots, and get a text-based visual summary.
+- The visual check script will generate screenshots and a detailed text summary of the UI state (element positions, colors, text content, layout).
+
 Do NOT write code yet. Just output the plan."
 
 PLAN_OUTPUT=$(claude -p "$PROMPT_PLAN" --dangerously-skip-permissions)
@@ -115,6 +121,12 @@ Your task:
 3. Run tests (npm test, pytest, etc.) to verify your changes.
 4. Output a summary of what you implemented.
 
+IMPORTANT: You have Playwright available for browser automation and visual testing.
+- For UI/styling/visual tasks, use '.github/scripts/playwright-screenshot.sh' to verify your changes visually.
+- The script will start the app, take screenshots, and generate a text summary of the visual state.
+- Use this to ensure your CSS/HTML changes look correct before finishing.
+- Run 'node .github/scripts/visual-check.js' directly if you need more control over the visual testing.
+
 Implement the ENTIRE plan in this single session."
   else
     # Subsequent rounds: include reviewer feedback
@@ -131,6 +143,10 @@ Your task:
 2. Run tests to verify your fixes.
 3. Output a summary of what you fixed.
 
+IMPORTANT: You have Playwright available for browser automation and visual testing.
+- For UI/styling/visual issues, use '.github/scripts/playwright-screenshot.sh' to verify your fixes.
+- The script will generate screenshots and a text summary of the visual state.
+
 Address ALL reviewer concerns in this session."
   fi
   
@@ -145,6 +161,31 @@ Address ALL reviewer concerns in this session."
 $CODING_OUTPUT"
   
   # ==========================================
+  # 3.1.1. VISUAL CHECK (if app exists)
+  # ==========================================
+  VISUAL_SUMMARY=""
+  
+  if [ -f "$REPO_ROOT/backend/server.js" ]; then
+    echo "🎭 [RALPH] Running visual check (optional)..."
+    
+    # Try to run visual check, but don't fail if it doesn't work
+    if bash .github/scripts/playwright-screenshot.sh 2>&1 | tee /tmp/visual-check-output.txt; then
+      VISUAL_SUMMARY=$(cat /tmp/visual-check-output.txt)
+      echo "✅ [RALPH] Visual check completed"
+      
+      # Post visual summary as issue comment
+      post_comment "## Visual Check Results (Round $REVIEW_ROUND)
+
+\`\`\`
+$VISUAL_SUMMARY
+\`\`\`"
+    else
+      echo "⚠️  [RALPH] Visual check failed or not applicable - continuing with code-only review"
+      VISUAL_SUMMARY="Visual check was attempted but failed (this is okay - may not be a visual issue)"
+    fi
+  fi
+  
+  # ==========================================
   # 3.2. REVIEW STEP
   # ==========================================
   echo "🧐 [RALPH] Starting review for round $REVIEW_ROUND..."
@@ -152,7 +193,32 @@ $CODING_OUTPUT"
   # Get the current git diff (all changes since last commit)
   DIFF_OUTPUT=$(git --no-pager diff HEAD)
   
-  PROMPT_REVIEW="You are a Senior Code Reviewer reviewing changes for GitHub Issue #$ISSUE_NUMBER in repository $REPO.
+  # Build review prompt with optional visual summary
+  if [ -n "$VISUAL_SUMMARY" ]; then
+    PROMPT_REVIEW="You are a Senior Code Reviewer reviewing changes for GitHub Issue #$ISSUE_NUMBER in repository $REPO.
+
+Use the GitHub MCP tools to read the issue details.
+
+Here are the code changes:
+\`\`\`diff
+$DIFF_OUTPUT
+\`\`\`
+
+Visual Check Results (if this is a UI/styling issue):
+\`\`\`
+$VISUAL_SUMMARY
+\`\`\`
+
+Your task:
+1. Review the changes against the issue requirements.
+2. Check for bugs, security issues, code quality problems, and missing functionality.
+3. For UI/styling issues, consider the visual check results - do the changes produce the expected visual output?
+4. If the code is good and fully addresses the issue (including visual correctness if applicable), output EXACTLY: 'LGTM'
+5. If there are issues, output a detailed numbered list of problems that MUST be fixed.
+
+Be thorough but fair. Output ONLY 'LGTM' or the list of issues."
+  else
+    PROMPT_REVIEW="You are a Senior Code Reviewer reviewing changes for GitHub Issue #$ISSUE_NUMBER in repository $REPO.
 
 Use the GitHub MCP tools to read the issue details.
 
@@ -168,6 +234,7 @@ Your task:
 4. If there are issues, output a detailed numbered list of problems that MUST be fixed.
 
 Be thorough but fair. Output ONLY 'LGTM' or the list of issues."
+  fi
   
   REVIEW_OUTPUT=$(claude -p "$PROMPT_REVIEW" --dangerously-skip-permissions)
   
