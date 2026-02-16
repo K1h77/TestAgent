@@ -168,9 +168,12 @@ $CODING_OUTPUT"
   if [ -f "$REPO_ROOT/backend/server.js" ]; then
     echo "🎭 [RALPH] Running visual check (optional)..."
     
+    # Create a unique temp file for visual check output
+    VISUAL_CHECK_OUTPUT=$(mktemp /tmp/ralph-visual-check-XXXXXX.txt)
+    
     # Try to run visual check, but don't fail if it doesn't work
-    if bash .github/scripts/playwright-screenshot.sh 2>&1 | tee /tmp/visual-check-output.txt; then
-      VISUAL_SUMMARY=$(cat /tmp/visual-check-output.txt)
+    if bash .github/scripts/playwright-screenshot.sh 2>&1 | tee "$VISUAL_CHECK_OUTPUT"; then
+      VISUAL_SUMMARY=$(cat "$VISUAL_CHECK_OUTPUT")
       echo "✅ [RALPH] Visual check completed"
       
       # Post visual summary as issue comment
@@ -183,6 +186,9 @@ $VISUAL_SUMMARY
       echo "⚠️  [RALPH] Visual check failed or not applicable - continuing with code-only review"
       VISUAL_SUMMARY="Visual check was attempted but failed (this is okay - may not be a visual issue)"
     fi
+    
+    # Clean up temp file
+    rm -f "$VISUAL_CHECK_OUTPUT"
   fi
   
   # ==========================================

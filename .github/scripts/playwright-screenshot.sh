@@ -37,7 +37,8 @@ if [ "$SKIP_INSTALL" != "true" ]; then
   echo "📦 Installing Playwright dependencies..."
   
   # Install playwright npm package if not already installed
-  if ! npm list playwright >/dev/null 2>&1; then
+  # Check if playwright binary exists
+  if ! command -v npx >/dev/null 2>&1 || ! npx playwright --version >/dev/null 2>&1; then
     echo "  Installing playwright npm package..."
     npm install --no-save playwright
   else

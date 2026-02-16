@@ -288,11 +288,13 @@ async function runVisualCheck() {
   } catch (error) {
     console.error('❌ Visual check failed:', error);
     
-    // Try to take an error screenshot
+    // Try to take an error screenshot if page exists
     try {
-      const errorScreenshot = path.join(SCREENSHOTS_DIR, `${SCREENSHOT_PREFIX}-error.png`);
-      await page.screenshot({ path: errorScreenshot, fullPage: true }).catch(() => {});
-      console.log(`📸 Error screenshot saved to: ${errorScreenshot}`);
+      if (typeof page !== 'undefined' && page) {
+        const errorScreenshot = path.join(SCREENSHOTS_DIR, `${SCREENSHOT_PREFIX}-error.png`);
+        await page.screenshot({ path: errorScreenshot, fullPage: true }).catch(() => {});
+        console.log(`📸 Error screenshot saved to: ${errorScreenshot}`);
+      }
     } catch (e) {
       // Ignore screenshot errors
     }
