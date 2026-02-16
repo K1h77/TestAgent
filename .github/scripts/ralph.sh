@@ -101,6 +101,7 @@ fi
 MAX_REVIEW_ROUNDS=3
 REVIEW_ROUND=1
 REVIEWER_FEEDBACK=""
+FINAL_VISUAL_SUMMARY=""
 
 while [ $REVIEW_ROUND -le $MAX_REVIEW_ROUNDS ]; do
   echo "🔨 [RALPH] Coding Round $REVIEW_ROUND / $MAX_REVIEW_ROUNDS"
@@ -256,6 +257,11 @@ $REVIEW_OUTPUT"
   if [[ "$REVIEW_OUTPUT" == *"LGTM"* ]]; then
     echo "✅ [RALPH] Review passed!"
     
+    # Preserve visual summary from this successful round for PR body
+    if [ -n "$VISUAL_SUMMARY" ]; then
+      FINAL_VISUAL_SUMMARY="$VISUAL_SUMMARY"
+    fi
+    
     # ==========================================
     # 4. CREATE BRANCH, COMMIT, PUSH, PR
     # ==========================================
@@ -285,6 +291,16 @@ $CODING_OUTPUT
 
 ## Review
 $REVIEW_OUTPUT"
+    
+    # Add visual check results if available
+    if [ -n "$FINAL_VISUAL_SUMMARY" ]; then
+      PR_BODY="$PR_BODY
+
+## Visual Check Results
+\`\`\`
+$FINAL_VISUAL_SUMMARY
+\`\`\`"
+    fi
     
     gh pr create \
       --repo "$REPO" \
