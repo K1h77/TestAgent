@@ -16,6 +16,8 @@ fi
 
 REPO="$GITHUB_REPOSITORY"
 MODEL="openrouter/deepseek/deepseek-r1"
+# Maximum lines to include in PR description from coding output
+PR_SUMMARY_MAX_LINES=10
 echo "🤖 [RALPH] Waking up. Target: Issue #$ISSUE_NUMBER in $REPO"
 
 # Ensure we are in the root of the repo
@@ -315,9 +317,9 @@ $REVIEW_OUTPUT"
     
     # Create PR using gh CLI
     # Extract a brief summary from CODING_OUTPUT (first few lines only)
-    BRIEF_SUMMARY=$(echo "$CODING_OUTPUT" | head -n 10)
+    BRIEF_SUMMARY=$(echo "$CODING_OUTPUT" | head -n "$PR_SUMMARY_MAX_LINES")
     # Add ellipsis if output was truncated
-    if [ $(echo "$CODING_OUTPUT" | wc -l) -gt 10 ]; then
+    if [ "$(echo "$CODING_OUTPUT" | wc -l)" -gt "$PR_SUMMARY_MAX_LINES" ]; then
       BRIEF_SUMMARY="$BRIEF_SUMMARY
 
 ...
