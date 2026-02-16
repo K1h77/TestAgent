@@ -47,7 +47,7 @@ echo "📋 [RALPH] Analyzing Issue..."
 
 PROMPT_PLAN="I am an autonomous agent working on GitHub Issue #$ISSUE_NUMBER in repository $REPO.
 
-1. The GitHub issue #$ISSUE_NUMBER is in repository $REPO. Use GitHub CLI (gh) or other available tools to read issue details if needed.
+1. You have access to GitHub CLI (gh) to read issue details. Use 'gh issue view $ISSUE_NUMBER --repo $REPO' to read the issue.
 2. Explore the codebase to understand the context.
 3. Create a detailed step-by-step plan (as a markdown checklist) to solve the issue.
 4. Output ONLY the plan in markdown format, starting with '## Plan' as the heading.
@@ -98,7 +98,7 @@ Here is the plan:
 $PLAN_OUTPUT
 
 Your task:
-1. The GitHub issue #$ISSUE_NUMBER is in repository $REPO. Use GitHub CLI (gh) or other available tools to read issue details if needed.
+1. You have access to GitHub CLI (gh) to read issue details. Use 'gh issue view $ISSUE_NUMBER --repo $REPO' if needed.
 2. Implement ALL items in the plan.
 3. Run tests (npm test, pytest, etc.) to verify your changes.
 4. Output a summary of what you implemented.
@@ -206,7 +206,7 @@ $VISUAL_SUMMARY
   if [ -n "$VISUAL_SUMMARY" ]; then
     PROMPT_REVIEW="You are a Senior Code Reviewer reviewing changes for GitHub Issue #$ISSUE_NUMBER in repository $REPO.
 
-The GitHub issue #$ISSUE_NUMBER is in repository $REPO. Use GitHub CLI (gh) or other available tools to read issue details if needed.
+You have access to GitHub CLI (gh) to read issue details. Use 'gh issue view $ISSUE_NUMBER --repo $REPO' if needed.
 
 Here are the code changes:
 \`\`\`diff
@@ -229,7 +229,7 @@ Be thorough but fair. Output ONLY 'LGTM' or the list of issues."
   else
     PROMPT_REVIEW="You are a Senior Code Reviewer reviewing changes for GitHub Issue #$ISSUE_NUMBER in repository $REPO.
 
-The GitHub issue #$ISSUE_NUMBER is in repository $REPO. Use GitHub CLI (gh) or other available tools to read issue details if needed.
+You have access to GitHub CLI (gh) to read issue details. Use 'gh issue view $ISSUE_NUMBER --repo $REPO' if needed.
 
 Here are the code changes:
 \`\`\`diff
