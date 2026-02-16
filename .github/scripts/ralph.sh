@@ -204,7 +204,7 @@ $VISUAL_SUMMARY
   git add -A
   
   # Check if there are any changes
-  if git diff --cached --quiet HEAD; then
+  if git diff --cached --quiet; then
     echo "⚠️  [RALPH] No changes detected after coding round."
     post_comment "⚠️ **Warning**: Coding round $REVIEW_ROUND completed but no file changes were detected. Claude may have encountered an issue."
     
@@ -218,7 +218,7 @@ $VISUAL_SUMMARY
   fi
   
   # Get the diff of ALL staged changes (includes new files!)
-  DIFF_OUTPUT=$(git --no-pager diff --cached HEAD)
+  DIFF_OUTPUT=$(git --no-pager diff --cached HEAD 2>/dev/null || git --no-pager diff --cached)
   
   # Build review prompt with optional visual summary
   if [ -n "$VISUAL_SUMMARY" ]; then

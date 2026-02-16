@@ -35,7 +35,7 @@ jobs:
         id: npm-cache
         uses: actions/cache@v4
         with:
-          path: ~/.npm
+          path: /opt/hostedtoolcache/node/22.*/x64/lib/node_modules
           key: npm-global-${{ runner.os }}-${{ hashFiles('.github/workflows/ralph.yaml') }}
           restore-keys: |
             npm-global-${{ runner.os }}-
