@@ -316,6 +316,14 @@ $REVIEW_OUTPUT"
     # Create PR using gh CLI
     # Extract a brief summary from CODING_OUTPUT (first few lines only)
     BRIEF_SUMMARY=$(echo "$CODING_OUTPUT" | head -n 10)
+    # Add ellipsis if output was truncated
+    if [ $(echo "$CODING_OUTPUT" | wc -l) -gt 10 ]; then
+      BRIEF_SUMMARY="$BRIEF_SUMMARY
+
+...
+
+_(Full details available in workflow logs and issue comments)_"
+    fi
     
     PR_BODY="Closes #$ISSUE_NUMBER
 
