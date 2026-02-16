@@ -44,7 +44,7 @@ Title: {{.title}}
 Body:
 {{.body}}
 
-Labels: {{range .labels}}{{.name}}, {{end}}
+Labels: {{range $i, $e := .labels}}{{if $i}}, {{end}}{{$e.name}}{{end}}
 ')
 
 echo "Issue details:"
@@ -120,7 +120,7 @@ $PLAN_OUTPUT
 
 Your task:
 1. Implement ALL items in the plan.
-2. Run tests (npm test, pytest, etc.) to verify your changes.
+2. Make sure your changes follow best practices and would pass tests.
 3. Output a summary of what you implemented.
 
 IMPORTANT: You have Playwright available for browser automation and visual testing.
@@ -142,7 +142,7 @@ $REVIEWER_FEEDBACK
 
 Your task:
 1. Fix ALL the issues mentioned by the reviewer.
-2. Run tests to verify your fixes.
+2. Make sure your fixes follow best practices.
 3. Output a summary of what you fixed.
 
 IMPORTANT: You have Playwright available for browser automation and visual testing.
