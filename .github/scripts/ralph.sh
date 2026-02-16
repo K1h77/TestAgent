@@ -218,6 +218,7 @@ $VISUAL_SUMMARY
   fi
   
   # Get the diff of ALL staged changes (includes new files!)
+  # Fallback to diff without HEAD reference for repos without HEAD (initial commits)
   DIFF_OUTPUT=$(git --no-pager diff --cached HEAD 2>/dev/null || git --no-pager diff --cached)
   
   # Build review prompt with optional visual summary
