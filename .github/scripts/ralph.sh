@@ -149,8 +149,8 @@ $CODING_OUTPUT"
   # ==========================================
   echo "🧐 [RALPH] Starting review for round $REVIEW_ROUND..."
   
-  # Get the current git diff
-  DIFF_OUTPUT=$(git --no-pager diff)
+  # Get the current git diff (all changes since last commit)
+  DIFF_OUTPUT=$(git --no-pager diff HEAD)
   
   PROMPT_REVIEW="You are a Senior Code Reviewer reviewing changes for GitHub Issue #$ISSUE_NUMBER in repository $REPO.
 
@@ -235,6 +235,28 @@ Review passed after $REVIEW_ROUND round(s)."
   if [ $REVIEW_ROUND -ge $MAX_REVIEW_ROUNDS ]; then
     echo "❌ [RALPH] Failed after $MAX_REVIEW_ROUNDS review rounds."
     
+    # Check if there are any changes to push
+    if git diff --quiet HEAD; then
+      echo "⚠️  [RALPH] No changes to commit."
+      
+      # Post failure comment without branch
+      FAILURE_MSG="❌ **Failed** after $MAX_REVIEW_ROUNDS review rounds.
+
+## Last Review Issues
+$REVIEWER_FEEDBACK
+
+## What to do
+No code changes were made. The agent may have encountered issues or the problem may require a different approach.
+
+You can:
+1. Add the \`ralph-retry\` label to try again
+2. Manually implement the changes
+3. Close this issue if it's no longer needed"
+      
+      post_comment "$FAILURE_MSG"
+      exit 1
+    fi
+    
     # Push WIP branch
     BRANCH_NAME="wip/issue-$ISSUE_NUMBER-auto-$(date +%s)"
     
@@ -243,8 +265,8 @@ Review passed after $REVIEW_ROUND round(s)."
     
     git checkout -b "$BRANCH_NAME"
     git add .
-    git commit -m "WIP: Issue #$ISSUE_NUMBER (failed after $MAX_REVIEW_ROUNDS rounds)" || true
-    git push origin "$BRANCH_NAME" || true
+    git commit -m "WIP: Issue #$ISSUE_NUMBER (failed after $MAX_REVIEW_ROUNDS rounds)"
+    git push origin "$BRANCH_NAME"
     
     # Post failure comment
     FAILURE_MSG="❌ **Failed** after $MAX_REVIEW_ROUNDS review rounds.
