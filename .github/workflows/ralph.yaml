@@ -6,7 +6,7 @@ on:
 
 jobs:
   agent-run:
-    if: contains(github.event.issue.labels.*.name, 'auto-fix')
+    if: contains(github.event.issue.labels.*.name, 'auto-fix') || contains(github.event.issue.labels.*.name, 'ralph-retry') || contains(github.event.issue.labels.*.name, 'plan-approved')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -25,12 +25,34 @@ jobs:
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
 
+      - name: Remove ralph-retry label if present
+        if: contains(github.event.issue.labels.*.name, 'ralph-retry')
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --remove-label "ralph-retry" || true
+
+      - name: Determine plan approval requirement
+        id: plan-check
+        run: |
+          PLAN_APPROVAL_REQUIRED="false"
+          if [[ "${{ contains(github.event.issue.labels.*.name, 'plan-await-approval') }}" == "true" ]] && [[ "${{ contains(github.event.issue.labels.*.name, 'plan-approved') }}" == "false" ]]; then
+            PLAN_APPROVAL_REQUIRED="true"
+          fi
+          echo "PLAN_APPROVAL_REQUIRED=$PLAN_APPROVAL_REQUIRED" >> $GITHUB_OUTPUT
+          echo "Plan approval required: $PLAN_APPROVAL_REQUIRED"
+
       - name: Run Ralph Agent
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_CREATOR: ${{ github.event.issue.user.login }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PLAN_APPROVAL_REQUIRED: ${{ steps.plan-check.outputs.PLAN_APPROVAL_REQUIRED }}
           # Model Selection Logic (Feb 2026 IDs)
           MODEL_ID: >-
             ${{ 
