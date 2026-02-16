@@ -15,6 +15,7 @@ if [ -z "$GITHUB_REPOSITORY" ]; then
 fi
 
 REPO="$GITHUB_REPOSITORY"
+MODEL="openrouter/deepseek/deepseek-r1"
 echo "🤖 [RALPH] Waking up. Target: Issue #$ISSUE_NUMBER in $REPO"
 
 # Ensure we are in the root of the repo
@@ -30,43 +31,41 @@ post_comment() {
 }
 
 # ==========================================
-# 1. SETUP: Configure Claude (Headless)
+# 1. SETUP: Configure Aider
 # ==========================================
-echo "🔧 [RALPH] Configuring Claude Code..."
-mkdir -p ~/.config/claude-code
+echo "🔧 [RALPH] Configuring Aider..."
+# Aider uses OPENROUTER_API_KEY environment variable automatically
 
-# Use the GitHub MCP server (via Docker) to give Claude native access to issues
-cat <<EOF > ~/.config/claude-code/config.json
-{
-  "mcpServers": {
-    "github": {
-      "command": "docker",
-      "args": [
-        "run", 
-        "-i", 
-        "--rm", 
-        "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", 
-        "ghcr.io/github/github-mcp-server:latest"
-      ],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "$PAT_TOKEN"
-      }
-    }
-  }
-}
-EOF
+# Fetch issue details to include in prompts
+echo "📖 [RALPH] Fetching issue details..."
+ISSUE_DETAILS=$(gh issue view "$ISSUE_NUMBER" --repo "$REPO" --json title,body,labels --template '
+Title: {{.title}}
+
+Body:
+{{.body}}
+
+Labels: {{range $i, $e := .labels}}{{if $i}}, {{end}}{{$e.name}}{{end}}
+')
+
+echo "Issue details:"
+echo "$ISSUE_DETAILS"
 
 # ==========================================
 # 2. PLANNING PHASE
 # ==========================================
 echo "📋 [RALPH] Analyzing Issue..."
 
-# --dangerously-skip-permissions is critical for CI/CD so it doesn't ask for "Y/N"
-# -p runs in print (non-interactive) mode
+# --yes auto-approves all changes for CI/CD (non-interactive mode)
+# --model specifies the AI model to use
+# --message passes the prompt
 
 PROMPT_PLAN="I am an autonomous agent working on GitHub Issue #$ISSUE_NUMBER in repository $REPO.
 
-1. Use the GitHub MCP tools to read the issue details.
+Here are the issue details:
+$ISSUE_DETAILS
+
+Your task:
+1. Read and understand the issue details above.
 2. Explore the codebase to understand the context.
 3. Create a detailed step-by-step plan (as a markdown checklist) to solve the issue.
 4. Output ONLY the plan in markdown format, starting with '## Plan' as the heading.
@@ -78,7 +77,7 @@ IMPORTANT: You have access to Playwright for browser automation and visual testi
 
 Do NOT write code yet. Just output the plan."
 
-PLAN_OUTPUT=$(claude -p "$PROMPT_PLAN" --dangerously-skip-permissions)
+PLAN_OUTPUT=$(aider --yes --model "$MODEL" --message "$PROMPT_PLAN")
 
 echo "📝 [RALPH] Plan created:"
 echo "$PLAN_OUTPUT"
@@ -113,14 +112,16 @@ while [ $REVIEW_ROUND -le $MAX_REVIEW_ROUNDS ]; do
     # First round: just the plan and issue
     PROMPT_CODING="You are an autonomous agent working on GitHub Issue #$ISSUE_NUMBER in repository $REPO.
 
+Here are the issue details:
+$ISSUE_DETAILS
+
 Here is the plan:
 $PLAN_OUTPUT
 
 Your task:
-1. Use the GitHub MCP tools to read the issue details if needed.
-2. Implement ALL items in the plan.
-3. Run tests (npm test, pytest, etc.) to verify your changes.
-4. Output a summary of what you implemented.
+1. Implement ALL items in the plan.
+2. Make sure your changes follow best practices and would pass tests.
+3. Output a summary of what you implemented.
 
 IMPORTANT: You have Playwright available for browser automation and visual testing.
 - For UI/styling/visual tasks, use '.github/scripts/playwright-screenshot.sh' to verify your changes visually.
@@ -141,7 +142,7 @@ $REVIEWER_FEEDBACK
 
 Your task:
 1. Fix ALL the issues mentioned by the reviewer.
-2. Run tests to verify your fixes.
+2. Make sure your fixes follow best practices.
 3. Output a summary of what you fixed.
 
 IMPORTANT: You have Playwright available for browser automation and visual testing.
@@ -151,7 +152,7 @@ IMPORTANT: You have Playwright available for browser automation and visual testi
 Address ALL reviewer concerns in this session."
   fi
   
-  CODING_OUTPUT=$(claude -p "$PROMPT_CODING" --dangerously-skip-permissions)
+  CODING_OUTPUT=$(aider --yes --model "$MODEL" --message "$PROMPT_CODING")
   
   echo "✅ [RALPH] Coding complete for round $REVIEW_ROUND"
   echo "$CODING_OUTPUT"
@@ -206,7 +207,7 @@ $VISUAL_SUMMARY
   # Check if there are any changes
   if git diff --cached --quiet; then
     echo "⚠️  [RALPH] No changes detected after coding round."
-    post_comment "⚠️ **Warning**: Coding round $REVIEW_ROUND completed but no file changes were detected. Claude may have encountered an issue."
+    post_comment "⚠️ **Warning**: Coding round $REVIEW_ROUND completed but no file changes were detected. Aider may have encountered an issue."
     
     if [ $REVIEW_ROUND -ge $MAX_REVIEW_ROUNDS ]; then
       post_comment "❌ **Failed**: No code changes were made after $MAX_REVIEW_ROUNDS rounds."
@@ -225,7 +226,8 @@ $VISUAL_SUMMARY
   if [ -n "$VISUAL_SUMMARY" ]; then
     PROMPT_REVIEW="You are a Senior Code Reviewer reviewing changes for GitHub Issue #$ISSUE_NUMBER in repository $REPO.
 
-Use the GitHub MCP tools to read the issue details.
+Here are the issue details:
+$ISSUE_DETAILS
 
 Here are the code changes:
 \`\`\`diff
@@ -248,7 +250,8 @@ Be thorough but fair. Output ONLY 'LGTM' or the list of issues."
   else
     PROMPT_REVIEW="You are a Senior Code Reviewer reviewing changes for GitHub Issue #$ISSUE_NUMBER in repository $REPO.
 
-Use the GitHub MCP tools to read the issue details.
+Here are the issue details:
+$ISSUE_DETAILS
 
 Here are the code changes:
 \`\`\`diff
@@ -264,7 +267,7 @@ Your task:
 Be thorough but fair. Output ONLY 'LGTM' or the list of issues."
   fi
   
-  REVIEW_OUTPUT=$(claude -p "$PROMPT_REVIEW" --dangerously-skip-permissions)
+  REVIEW_OUTPUT=$(aider --yes --model "$MODEL" --message "$PROMPT_REVIEW")
   
   echo "📋 [RALPH] Review result:"
   echo "$REVIEW_OUTPUT"
