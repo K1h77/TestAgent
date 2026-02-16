@@ -6,7 +6,7 @@ on:
 
 jobs:
   agent-run:
-    if: github.event.label.name == 'auto-fix'
+    if: contains(github.event.issue.labels.*.name, 'auto-fix')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -25,11 +25,19 @@ jobs:
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
 
-      - name: Run Ralph Script
+      - name: Run Ralph Agent
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_CREATOR: ${{ github.event.issue.user.login }}
+          # Model Selection Logic (Feb 2026 IDs)
+          MODEL_ID: >-
+            ${{ 
+              contains(github.event.issue.labels.*.name, 'model:opus') && 'claude-opus-4-6' ||
+              contains(github.event.issue.labels.*.name, 'model:haiku') && 'claude-haiku-4-5' ||
+              'claude-sonnet-4-5'
+            }}
         run: |
           chmod +x .github/scripts/ralph.sh
           .github/scripts/ralph.sh
