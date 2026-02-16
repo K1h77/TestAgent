@@ -32,7 +32,7 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           REPO: ${{ github.repository }}
         run: |
-          gh label remove "$ISSUE_NUMBER" ralph-retry --repo "$REPO" || true
+          gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --remove-label "ralph-retry" || true
 
       - name: Determine plan approval requirement
         id: plan-check
