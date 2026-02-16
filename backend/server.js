@@ -10,7 +10,7 @@ app.use(express.json());
 
 // In-memory storage for tasks
 let tasks = [
-  { id: 1, title: 'Sample Task', completed: false, description: 'This is a sample task' }
+  { id: 1, title: 'Sample Task', description: 'This is a sample task', completed: false }
 ];
 let nextId = 2;
 
