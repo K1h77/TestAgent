@@ -49,7 +49,7 @@ jobs:
 
       - name: Install Aider
         if: steps.npm-cache.outputs.cache-hit != 'true'
-        run: pip install aider-chat
+        run: pip install aider-chat==0.67.0
 
       - name: Remove ralph-retry label if present
         if: contains(github.event.issue.labels.*.name, 'ralph-retry')

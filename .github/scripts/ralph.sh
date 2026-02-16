@@ -15,6 +15,7 @@ if [ -z "$GITHUB_REPOSITORY" ]; then
 fi
 
 REPO="$GITHUB_REPOSITORY"
+MODEL="openrouter/deepseek/deepseek-r1"
 echo "🤖 [RALPH] Waking up. Target: Issue #$ISSUE_NUMBER in $REPO"
 
 # Ensure we are in the root of the repo
@@ -58,7 +59,7 @@ IMPORTANT: You have access to Playwright for browser automation and visual testi
 
 Do NOT write code yet. Just output the plan."
 
-PLAN_OUTPUT=$(aider --yes --model openrouter/deepseek/deepseek-r1 --message "$PROMPT_PLAN")
+PLAN_OUTPUT=$(aider --yes --model "$MODEL" --message "$PROMPT_PLAN")
 
 echo "📝 [RALPH] Plan created:"
 echo "$PLAN_OUTPUT"
@@ -131,7 +132,7 @@ IMPORTANT: You have Playwright available for browser automation and visual testi
 Address ALL reviewer concerns in this session."
   fi
   
-  CODING_OUTPUT=$(aider --yes --model openrouter/deepseek/deepseek-r1 --message "$PROMPT_CODING")
+  CODING_OUTPUT=$(aider --yes --model "$MODEL" --message "$PROMPT_CODING")
   
   echo "✅ [RALPH] Coding complete for round $REVIEW_ROUND"
   echo "$CODING_OUTPUT"
@@ -244,7 +245,7 @@ Your task:
 Be thorough but fair. Output ONLY 'LGTM' or the list of issues."
   fi
   
-  REVIEW_OUTPUT=$(aider --yes --model openrouter/deepseek/deepseek-r1 --message "$PROMPT_REVIEW")
+  REVIEW_OUTPUT=$(aider --yes --model "$MODEL" --message "$PROMPT_REVIEW")
   
   echo "📋 [RALPH] Review result:"
   echo "$REVIEW_OUTPUT"
