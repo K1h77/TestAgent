@@ -22,12 +22,33 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('.github/workflows/ralph.yaml') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Cache npm global packages
+        id: npm-cache
+        uses: actions/cache@v4
+        with:
+          # Cache global node_modules for the Node version specified in setup-node
+          path: /opt/hostedtoolcache/node/22.*/x64/lib/node_modules
+          key: npm-global-${{ runner.os }}-${{ hashFiles('.github/workflows/ralph.yaml') }}
+          restore-keys: |
+            npm-global-${{ runner.os }}-
+
       - name: Install Playwright and dependencies
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: |
           npm install --no-save playwright
           npx playwright install chromium --with-deps
 
       - name: Install Claude Code
+        if: steps.npm-cache.outputs.cache-hit != 'true'
         run: npm install -g @anthropic-ai/claude-code
 
       - name: Remove ralph-retry label if present
@@ -57,6 +78,7 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_CREATOR: ${{ github.event.issue.user.login }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
           PLAN_APPROVAL_REQUIRED: ${{ steps.plan-check.outputs.PLAN_APPROVAL_REQUIRED }}
           # Model Selection Logic (Feb 2026 IDs)
           MODEL_ID: >-
@@ -68,3 +90,12 @@ jobs:
         run: |
           chmod +x .github/scripts/ralph.sh
           .github/scripts/ralph.sh
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ralph-screenshots-issue-${{ github.event.issue.number }}
+          path: screenshots/
+          if-no-files-found: ignore
+          retention-days: 30

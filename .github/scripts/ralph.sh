@@ -180,6 +180,9 @@ $CODING_OUTPUT"
       # Post visual summary as issue comment
       post_comment "## Visual Check Results (Round $REVIEW_ROUND)
 
+📸 **Screenshots will be available as workflow artifacts:**
+https://github.com/$REPO/actions/runs/$GITHUB_RUN_ID
+
 \`\`\`
 $VISUAL_SUMMARY
 \`\`\`"
@@ -197,8 +200,26 @@ $VISUAL_SUMMARY
   # ==========================================
   echo "🧐 [RALPH] Starting review for round $REVIEW_ROUND..."
   
-  # Get the current git diff (all changes since last commit)
-  DIFF_OUTPUT=$(git --no-pager diff HEAD)
+  # Stage all changes FIRST (including new untracked files)
+  git add -A
+  
+  # Check if there are any changes
+  if git diff --cached --quiet; then
+    echo "⚠️  [RALPH] No changes detected after coding round."
+    post_comment "⚠️ **Warning**: Coding round $REVIEW_ROUND completed but no file changes were detected. Claude may have encountered an issue."
+    
+    if [ $REVIEW_ROUND -ge $MAX_REVIEW_ROUNDS ]; then
+      post_comment "❌ **Failed**: No code changes were made after $MAX_REVIEW_ROUNDS rounds."
+      exit 1
+    fi
+    
+    ((REVIEW_ROUND++))
+    continue
+  fi
+  
+  # Get the diff of ALL staged changes (includes new files!)
+  # Fallback to diff without HEAD reference for repos without HEAD (initial commits)
+  DIFF_OUTPUT=$(git --no-pager diff --cached HEAD 2>/dev/null || git --no-pager diff --cached)
   
   # Build review prompt with optional visual summary
   if [ -n "$VISUAL_SUMMARY" ]; then
