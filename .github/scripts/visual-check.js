@@ -190,7 +190,14 @@ async function runVisualCheck() {
     
     const initialSummary = await generateVisualSummary(page, initialScreenshot, 'initial');
 
-    // 2. Add a new task
+    // 2. Test login
+    console.log('🔐 Testing: Login...');
+    await page.fill('#username', 'testuser');
+    await page.fill('#password', 'password');
+    await page.click('button:has-text("Sign In")');
+    await page.waitForTimeout(1000);
+
+    // 3. Add a new task
     console.log('➕ Testing: Add new task...');
     await page.fill('#taskTitle', 'Test Task from Playwright');
     await page.fill('#taskDescription', 'This task was added by the visual check script');
@@ -202,7 +209,7 @@ async function runVisualCheck() {
     
     const afterAddSummary = await generateVisualSummary(page, afterAddScreenshot, 'after-add-task');
 
-    // 3. Toggle task completion
+    // 4. Toggle task completion
     console.log('✅ Testing: Toggle task completion...');
     const completeButton = page.locator('.complete-btn').first();
     if (await completeButton.isVisible()) {

@@ -1,8 +1,22 @@
 const API_URL = 'http://localhost:3000/api';
 
-// Load tasks when page loads
+// Handle login and show main UI
 document.addEventListener('DOMContentLoaded', () => {
-    loadTasks();
+    const loginForm = document.getElementById('loginForm');
+    const loginContainer = document.getElementById('loginContainer');
+    const mainContainer = document.getElementById('mainContainer');
+    
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        // Mock login - any credentials work
+        loginContainer.style.display = 'none';
+        mainContainer.style.display = 'block';
+        loadTasks();
+    });
+    
+    // Show login form initially
+    loginContainer.style.display = 'block';
+    mainContainer.style.display = 'none';
 });
 
 // Load all tasks from the API

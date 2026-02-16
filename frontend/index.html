@@ -7,7 +7,19 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
+    <div class="login-container" id="loginContainer">
+        <div class="login-form">
+            <h1>📝 Task Manager</h1>
+            <h2>Sign In</h2>
+            <form id="loginForm">
+                <input type="text" id="username" placeholder="Username" class="text-input" required>
+                <input type="password" id="password" placeholder="Password" class="text-input" required>
+                <button type="submit">Sign In</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="container" id="mainContainer" style="display: none;">
         <h1>📝 Task Manager</h1>
         
         <div class="add-task-section">
