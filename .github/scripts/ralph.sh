@@ -9,10 +9,24 @@ if [ -z "$ISSUE_NUMBER" ]; then
   exit 1
 fi
 
-echo "🤖 [RALPH] Waking up. Target: Issue #$ISSUE_NUMBER"
+if [ -z "$GITHUB_REPOSITORY" ]; then
+  echo "❌ Error: GITHUB_REPOSITORY env var missing."
+  exit 1
+fi
+
+REPO="$GITHUB_REPOSITORY"
+echo "🤖 [RALPH] Waking up. Target: Issue #$ISSUE_NUMBER in $REPO"
 
 # Ensure we are in the root of the repo
 cd "$(git rev-parse --show-toplevel)"
+
+# ==========================================
+# HELPER FUNCTION: Post Issue Comment
+# ==========================================
+post_comment() {
+  local body="$1"
+  gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body "$body"
+}
 
 # ==========================================
 # 1. SETUP: Configure Claude (Headless)
@@ -49,51 +63,130 @@ echo "📋 [RALPH] Analyzing Issue..."
 # --dangerously-skip-permissions is critical for CI/CD so it doesn't ask for "Y/N"
 # -p runs in print (non-interactive) mode
 
-PROMPT_PLAN="I am an autonomous agent working on GitHub Issue #$ISSUE_NUMBER.
-1. Read the issue details.
+PROMPT_PLAN="I am an autonomous agent working on GitHub Issue #$ISSUE_NUMBER in repository $REPO.
+
+1. Use the GitHub MCP tools to read the issue details.
 2. Explore the codebase to understand the context.
-3. Create a file named 'PLAN.md' with a step-by-step checklist to solve the issue.
-4. Create a file named 'PROGRESS.md' to track status.
-Do NOT write code yet. Just plan."
+3. Create a detailed step-by-step plan (as a markdown checklist) to solve the issue.
+4. Output ONLY the plan in markdown format, starting with '## Plan' as the heading.
 
-claude -p "$PROMPT_PLAN" --dangerously-skip-permissions
+Do NOT write code yet. Just output the plan."
 
-# ==========================================
-# 3. CODING LOOP (Max 5 iterations)
-# ==========================================
-MAX_LOOPS=5
-CURRENT_LOOP=1
+PLAN_OUTPUT=$(claude -p "$PROMPT_PLAN" --dangerously-skip-permissions)
 
-while [ $CURRENT_LOOP -le $MAX_LOOPS ]; do
-    echo "🔨 [RALPH] Coding Loop $CURRENT_LOOP / $MAX_LOOPS"
-    
-    PROMPT_LOOP="Read 'PLAN.md' and 'PROGRESS.md'.
-    Pick the next unchecked item. Implement it.
-    Run local tests (npm test / pytest) to verify.
-    Update 'PLAN.md' and 'PROGRESS.md'.
-    
-    If the plan is fully done and tests pass, output exactly: 'RALPH_COMPLETE'.
-    Otherwise, output 'CONTINUING'."
-    
-    OUTPUT=$(claude -p "$PROMPT_LOOP" --dangerously-skip-permissions)
-    echo "$OUTPUT"
-    
-    if [[ "$OUTPUT" == *"RALPH_COMPLETE"* ]]; then
-        echo "✅ [RALPH] Tasks Completed."
-        break
-    fi
-    ((CURRENT_LOOP++))
-done
+echo "📝 [RALPH] Plan created:"
+echo "$PLAN_OUTPUT"
+
+# Post plan as issue comment
+post_comment "$PLAN_OUTPUT"
 
 # ==========================================
-# 4. FRESH REVIEW & PR
+# 2.1. PLAN APPROVAL CHECK
 # ==========================================
-echo "🧐 [RALPH] Reviewing work..."
+if [ "$PLAN_APPROVAL_REQUIRED" = "true" ]; then
+  echo "⏸️  [RALPH] Plan awaiting approval..."
+  post_comment "⏸️ **Plan awaiting approval** — Add the \`plan-approved\` label to continue."
+  exit 0
+fi
 
-REVIEW_RESULT=$(claude -p "Act as a Senior Reviewer. Run 'git diff'. Compare against Issue #$ISSUE_NUMBER. If code is good, output 'PASS'. If bad, output 'FAIL'." --dangerously-skip-permissions)
+# ==========================================
+# 3. CODING ↔ REVIEW LOOP (Max 3 rounds)
+# ==========================================
+MAX_REVIEW_ROUNDS=3
+REVIEW_ROUND=1
+REVIEWER_FEEDBACK=""
 
-if [[ "$REVIEW_RESULT" == *"PASS"* ]]; then
-    echo "🚀 Review Passed. Creating PR..."
+while [ $REVIEW_ROUND -le $MAX_REVIEW_ROUNDS ]; do
+  echo "🔨 [RALPH] Coding Round $REVIEW_ROUND / $MAX_REVIEW_ROUNDS"
+  
+  # ==========================================
+  # 3.1. CODING STEP
+  # ==========================================
+  if [ $REVIEW_ROUND -eq 1 ]; then
+    # First round: just the plan and issue
+    PROMPT_CODING="You are an autonomous agent working on GitHub Issue #$ISSUE_NUMBER in repository $REPO.
+
+Here is the plan:
+$PLAN_OUTPUT
+
+Your task:
+1. Use the GitHub MCP tools to read the issue details if needed.
+2. Implement ALL items in the plan.
+3. Run tests (npm test, pytest, etc.) to verify your changes.
+4. Output a summary of what you implemented.
+
+Implement the ENTIRE plan in this single session."
+  else
+    # Subsequent rounds: include reviewer feedback
+    PROMPT_CODING="You are an autonomous agent working on GitHub Issue #$ISSUE_NUMBER in repository $REPO.
+
+Here is the original plan:
+$PLAN_OUTPUT
+
+The reviewer found issues in your previous implementation:
+$REVIEWER_FEEDBACK
+
+Your task:
+1. Fix ALL the issues mentioned by the reviewer.
+2. Run tests to verify your fixes.
+3. Output a summary of what you fixed.
+
+Address ALL reviewer concerns in this session."
+  fi
+  
+  CODING_OUTPUT=$(claude -p "$PROMPT_CODING" --dangerously-skip-permissions)
+  
+  echo "✅ [RALPH] Coding complete for round $REVIEW_ROUND"
+  echo "$CODING_OUTPUT"
+  
+  # Post coding summary as issue comment
+  post_comment "## Coding Round $REVIEW_ROUND
+
+$CODING_OUTPUT"
+  
+  # ==========================================
+  # 3.2. REVIEW STEP
+  # ==========================================
+  echo "🧐 [RALPH] Starting review for round $REVIEW_ROUND..."
+  
+  # Get the current git diff
+  DIFF_OUTPUT=$(git --no-pager diff)
+  
+  PROMPT_REVIEW="You are a Senior Code Reviewer reviewing changes for GitHub Issue #$ISSUE_NUMBER in repository $REPO.
+
+Use the GitHub MCP tools to read the issue details.
+
+Here are the code changes:
+\`\`\`diff
+$DIFF_OUTPUT
+\`\`\`
+
+Your task:
+1. Review the changes against the issue requirements.
+2. Check for bugs, security issues, code quality problems, and missing functionality.
+3. If the code is good and fully addresses the issue, output EXACTLY: 'LGTM'
+4. If there are issues, output a detailed numbered list of problems that MUST be fixed.
+
+Be thorough but fair. Output ONLY 'LGTM' or the list of issues."
+  
+  REVIEW_OUTPUT=$(claude -p "$PROMPT_REVIEW" --dangerously-skip-permissions)
+  
+  echo "📋 [RALPH] Review result:"
+  echo "$REVIEW_OUTPUT"
+  
+  # Post review output as issue comment
+  post_comment "## Review Round $REVIEW_ROUND
+
+$REVIEW_OUTPUT"
+  
+  # Check if review passed
+  if [[ "$REVIEW_OUTPUT" == *"LGTM"* ]]; then
+    echo "✅ [RALPH] Review passed!"
+    
+    # ==========================================
+    # 4. CREATE BRANCH, COMMIT, PUSH, PR
+    # ==========================================
+    echo "🚀 [RALPH] Creating PR..."
     
     BRANCH_NAME="fix/issue-$ISSUE_NUMBER-auto-$(date +%s)"
     
@@ -101,19 +194,77 @@ if [[ "$REVIEW_RESULT" == *"PASS"* ]]; then
     git config --global user.email "ralph-bot@users.noreply.github.com"
     git config --global user.name "Ralph Bot"
     
-    # Create Branch & Push
+    # Create Branch & Commit
     git checkout -b "$BRANCH_NAME"
     git add .
     git commit -m "Fix: Automated resolution for Issue #$ISSUE_NUMBER"
+    
+    # Push Branch
     git push origin "$BRANCH_NAME"
     
-    # Open PR via Claude
-    claude -p "Create a Pull Request for branch '$BRANCH_NAME' targeting 'main'.
-    Title: 'Fix: Issue #$ISSUE_NUMBER (Ralph Agent)'
-    Body: 'Closes #$ISSUE_NUMBER. Automatically generated by Ralph.'" --dangerously-skip-permissions
+    # Create PR using gh CLI
+    PR_BODY="Closes #$ISSUE_NUMBER
+
+This PR was automatically generated by Ralph, the autonomous coding agent.
+
+## What was done
+$CODING_OUTPUT
+
+## Review
+$REVIEW_OUTPUT"
     
-    echo "🎉 [RALPH] PR Created."
-else
-    echo "❌ Review Failed."
+    gh pr create \
+      --repo "$REPO" \
+      --base main \
+      --head "$BRANCH_NAME" \
+      --title "Fix: Issue #$ISSUE_NUMBER (Ralph Agent)" \
+      --body "$PR_BODY"
+    
+    # Post success comment
+    post_comment "✅ **Success!** Ralph has completed the work and created a PR.
+
+Review passed after $REVIEW_ROUND round(s)."
+    
+    echo "🎉 [RALPH] PR Created successfully."
+    exit 0
+  fi
+  
+  # Review failed - prepare for next round or fail
+  REVIEWER_FEEDBACK="$REVIEW_OUTPUT"
+  
+  if [ $REVIEW_ROUND -ge $MAX_REVIEW_ROUNDS ]; then
+    echo "❌ [RALPH] Failed after $MAX_REVIEW_ROUNDS review rounds."
+    
+    # Push WIP branch
+    BRANCH_NAME="wip/issue-$ISSUE_NUMBER-auto-$(date +%s)"
+    
+    git config --global user.email "ralph-bot@users.noreply.github.com"
+    git config --global user.name "Ralph Bot"
+    
+    git checkout -b "$BRANCH_NAME"
+    git add .
+    git commit -m "WIP: Issue #$ISSUE_NUMBER (failed after $MAX_REVIEW_ROUNDS rounds)" || true
+    git push origin "$BRANCH_NAME" || true
+    
+    # Post failure comment
+    FAILURE_MSG="❌ **Failed** after $MAX_REVIEW_ROUNDS review rounds.
+
+## Last Review Issues
+$REVIEWER_FEEDBACK
+
+## What to do
+The work-in-progress has been pushed to branch \`$BRANCH_NAME\`.
+
+You can:
+1. Review the changes manually and fix the remaining issues
+2. Add the \`ralph-retry\` label to try again
+3. Close this issue if it's no longer needed"
+    
+    post_comment "$FAILURE_MSG"
+    
     exit 1
-fi
+  fi
+  
+  echo "🔄 [RALPH] Review failed. Starting round $((REVIEW_ROUND + 1))..."
+  ((REVIEW_ROUND++))
+done
