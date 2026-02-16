@@ -47,9 +47,9 @@ jobs:
           npm install --no-save playwright
           npx playwright install chromium --with-deps
 
-      - name: Install Claude Code
+      - name: Install Aider
         if: steps.npm-cache.outputs.cache-hit != 'true'
-        run: npm install -g @anthropic-ai/claude-code
+        run: pip install aider-chat
 
       - name: Remove ralph-retry label if present
         if: contains(github.event.issue.labels.*.name, 'ralph-retry')
@@ -72,7 +72,7 @@ jobs:
 
       - name: Run Ralph Agent
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
           PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
@@ -80,13 +80,6 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           PLAN_APPROVAL_REQUIRED: ${{ steps.plan-check.outputs.PLAN_APPROVAL_REQUIRED }}
-          # Model Selection Logic (Feb 2026 IDs)
-          MODEL_ID: >-
-            ${{ 
-              contains(github.event.issue.labels.*.name, 'model:opus') && 'claude-opus-4-6' ||
-              contains(github.event.issue.labels.*.name, 'model:haiku') && 'claude-haiku-4-5' ||
-              'claude-sonnet-4-5'
-            }}
         run: |
           chmod +x .github/scripts/ralph.sh
           .github/scripts/ralph.sh
