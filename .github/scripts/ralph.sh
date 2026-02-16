@@ -40,8 +40,9 @@ echo "🔧 [RALPH] Configuring Aider..."
 # ==========================================
 echo "📋 [RALPH] Analyzing Issue..."
 
-# --dangerously-skip-permissions is critical for CI/CD so it doesn't ask for "Y/N"
-# -p runs in print (non-interactive) mode
+# --yes auto-approves all changes for CI/CD (non-interactive mode)
+# --model specifies the AI model to use
+# --message passes the prompt
 
 PROMPT_PLAN="I am an autonomous agent working on GitHub Issue #$ISSUE_NUMBER in repository $REPO.
 
