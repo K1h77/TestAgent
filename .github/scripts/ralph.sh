@@ -40,9 +40,8 @@ extract_summary() {
   local marker="$2"  # e.g., "## Summary" or "## Review Summary"
   
   # Extract content from marker to next ## heading or end of file
-  # First, extract from marker to end, then stop at next ## heading
-  echo "$raw_output" | awk -v marker="^${marker}" '
-    $0 ~ marker { found=1; next }
+  echo "$raw_output" | awk -v marker="${marker}" '
+    $0 ~ "^" marker { found=1; next }
     found && /^## / { exit }
     found { print }
   ' | sed '/^$/d' | head -20
@@ -115,6 +114,9 @@ REVIEW_ROUND=1
 REVIEWER_FEEDBACK=""
 FINAL_VISUAL_SUMMARY=""
 
+# Save initial commit SHA before any changes
+INITIAL_SHA=$(git rev-parse HEAD)
+
 while [ $REVIEW_ROUND -le $MAX_REVIEW_ROUNDS ]; do
   echo "🔨 [RALPH] Coding Round $REVIEW_ROUND / $MAX_REVIEW_ROUNDS"
   
@@ -166,8 +168,8 @@ IMPORTANT: You have Playwright available for browser automation and visual testi
 End your response with a section that starts with the line '## Summary' (on its own line). In this section, write 2-4 sentences explaining what you fixed and why, as if you're a developer posting a progress update to your team. Keep it casual and clear."
   fi
   
-  # Save current commit SHA before running aider
-  BEFORE_SHA=$(git rev-parse HEAD)
+  # Save current commit SHA before running aider (for this round only)
+  BEFORE_ROUND_SHA=$(git rev-parse HEAD)
   
   CODING_OUTPUT=$(aider --yes --model "$MODEL" $IMAGE_ARGS --message "$PROMPT_CODING")
   
@@ -182,17 +184,25 @@ End your response with a section that starts with the line '## Summary' (on its 
     CODING_SUMMARY="Completed coding changes. See full output in workflow logs."
   fi
   
-  # Also list which files were changed
-  CHANGED_FILES=$(git diff --name-only "$BEFORE_SHA" HEAD 2>/dev/null | head -20)
+  # Also list which files were changed (since this round started)
+  CHANGED_FILES=$(git diff --name-only "$BEFORE_ROUND_SHA" HEAD 2>/dev/null | head -20)
   if [ -z "$CHANGED_FILES" ]; then
-    CHANGED_FILES="(No files changed yet - changes may be uncommitted)"
+    CHANGED_FILES_DISPLAY="(No files changed yet - changes may be uncommitted)"
+  else
+    FILE_COUNT=$(echo "$CHANGED_FILES" | wc -l)
+    if [ "$FILE_COUNT" -gt 10 ]; then
+      # Show first 10 files and indicate there are more
+      CHANGED_FILES_DISPLAY="$(echo "$CHANGED_FILES" | head -10 | tr '\n' ' ' | sed 's/ $//')... and $((FILE_COUNT - 10)) more"
+    else
+      CHANGED_FILES_DISPLAY="$(echo "$CHANGED_FILES" | tr '\n' ' ' | sed 's/ $//')"
+    fi
   fi
   
   post_comment "## Update (Round $REVIEW_ROUND)
 
 $CODING_SUMMARY
 
-**Files changed:** \`$(echo "$CHANGED_FILES" | tr '\n' ' ' | sed 's/ $//')\`"
+**Files changed:** \`$CHANGED_FILES_DISPLAY\`"
   
   # ==========================================
   # 3.1.1. VISUAL CHECK (if app exists)
@@ -223,10 +233,10 @@ https://github.com/$REPO/actions/runs/$GITHUB_RUN_ID"
   echo "🧐 [RALPH] Starting review for round $REVIEW_ROUND..."
   
   # Get current commit SHA after aider ran
-  AFTER_SHA=$(git rev-parse HEAD)
+  AFTER_ROUND_SHA=$(git rev-parse HEAD)
   
-  # Check if aider made any commits
-  if [ "$BEFORE_SHA" = "$AFTER_SHA" ]; then
+  # Check if aider made any commits in this round
+  if [ "$BEFORE_ROUND_SHA" = "$AFTER_ROUND_SHA" ]; then
     # No commits were made by aider, check if there are uncommitted changes
     git add -A
     if git diff --cached --quiet; then
@@ -243,8 +253,8 @@ https://github.com/$REPO/actions/runs/$GITHUB_RUN_ID"
     fi
   fi
   
-  # Get the diff of changes made by aider (compare BEFORE_SHA to current HEAD)
-  DIFF_OUTPUT=$(git --no-pager diff "$BEFORE_SHA" HEAD 2>/dev/null || git --no-pager diff --cached)
+  # Get the diff of changes made by aider in this round
+  DIFF_OUTPUT=$(git --no-pager diff "$BEFORE_ROUND_SHA" HEAD 2>/dev/null || git --no-pager diff --cached)
   
   # Build review prompt
   PROMPT_REVIEW="You are a Senior Code Reviewer reviewing changes for GitHub Issue #$ISSUE_NUMBER in repository $REPO.
@@ -316,10 +326,10 @@ $REVIEW_SUMMARY"
     # ==========================================
     echo "🚀 [RALPH] Creating PR..."
     
-    # Check if Aider made commits, if not and there are changes, commit them
-    AFTER_SHA=$(git rev-parse HEAD)
-    if [ "$BEFORE_SHA" = "$AFTER_SHA" ]; then
-      # Aider didn't commit, check for uncommitted changes
+    # Check if any commits were made across all rounds, if not and there are changes, commit them
+    FINAL_SHA=$(git rev-parse HEAD)
+    if [ "$INITIAL_SHA" = "$FINAL_SHA" ]; then
+      # No commits were made by Aider, check for uncommitted changes
       git add -A
       if ! git diff --cached --quiet; then
         echo "📝 [RALPH] Committing uncommitted changes..."
@@ -370,10 +380,10 @@ Review passed after $REVIEW_ROUND round(s)."
   if [ $REVIEW_ROUND -ge $MAX_REVIEW_ROUNDS ]; then
     echo "❌ [RALPH] Failed after $MAX_REVIEW_ROUNDS review rounds."
     
-    # Check if there are any changes to push
-    AFTER_SHA=$(git rev-parse HEAD)
-    if [ "$BEFORE_SHA" = "$AFTER_SHA" ]; then
-      # No commits by Aider, check for uncommitted changes
+    # Check if there are any changes to push (across all rounds)
+    FINAL_SHA=$(git rev-parse HEAD)
+    if [ "$INITIAL_SHA" = "$FINAL_SHA" ]; then
+      # No commits by Aider across all rounds, check for uncommitted changes
       git add -A
       if git diff --cached --quiet; then
         echo "⚠️  [RALPH] No changes to commit."
