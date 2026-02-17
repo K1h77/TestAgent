@@ -20,7 +20,12 @@
     </div>
 
     <div class="container" id="mainContainer" style="display: none;">
-        <h1>📝 Task Manager</h1>
+        <div class="header">
+            <h1>📝 Task Manager</h1>
+            <button class="user-icon" id="userIcon" onclick="toggleProfile()">
+                <span>👤</span>
+            </button>
+        </div>
         
         <div class="add-task-section">
             <h2>Add New Task</h2>
@@ -32,6 +37,37 @@
         <div class="tasks-section">
             <h2>Tasks</h2>
             <div id="tasksList"></div>
+        </div>
+    </div>
+
+    <!-- Profile Modal -->
+    <div class="profile-modal" id="profileModal" style="display: none;">
+        <div class="profile-content">
+            <button class="close-btn" onclick="toggleProfile()">✕</button>
+            <h2>User Profile</h2>
+            <div class="profile-info">
+                <div class="profile-avatar">👤</div>
+                <div class="profile-field">
+                    <label>Name:</label>
+                    <span>John Doe</span>
+                </div>
+                <div class="profile-field">
+                    <label>Email:</label>
+                    <span>john.doe@example.com</span>
+                </div>
+                <div class="profile-field">
+                    <label>Username:</label>
+                    <span>johndoe</span>
+                </div>
+                <div class="profile-field">
+                    <label>Member Since:</label>
+                    <span>January 2024</span>
+                </div>
+                <div class="profile-field">
+                    <label>Role:</label>
+                    <span>User</span>
+                </div>
+            </div>
         </div>
     </div>
 

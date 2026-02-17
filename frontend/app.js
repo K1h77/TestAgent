@@ -140,3 +140,13 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+// Toggle profile modal visibility
+function toggleProfile() {
+    const profileModal = document.getElementById('profileModal');
+    if (profileModal.style.display === 'none') {
+        profileModal.style.display = 'flex';
+    } else {
+        profileModal.style.display = 'none';
+    }
+}

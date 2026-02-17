@@ -55,12 +55,44 @@ body {
     border-radius: 15px;
     padding: 30px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    position: relative;
 }
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.header h1 {
+    margin: 0;
+}
+
+.user-icon {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    cursor: pointer;
+    border: none;
+    padding: 0;
+    transition: transform 0.2s;
+}
+
+.user-icon:hover {
+    transform: scale(1.1);
+}
+
 
 h1 {
     text-align: center;
     color: #333;
-    margin-bottom: 30px;
     font-size: 2.5em;
 }
 
@@ -180,4 +212,90 @@ button:active {
     color: #999;
     padding: 40px;
     font-style: italic;
+}
+
+/* Profile Modal Styles */
+.profile-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.profile-content {
+    background: white;
+    padding: 40px;
+    border-radius: 15px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    width: 90%;
+    max-width: 500px;
+    position: relative;
+}
+
+.profile-content h2 {
+    text-align: center;
+    margin-bottom: 30px;
+    color: #333;
+}
+
+.close-btn {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: #e0e0e0;
+    color: #333;
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    cursor: pointer;
+    border: none;
+    padding: 0;
+    transition: background 0.2s;
+}
+
+.close-btn:hover {
+    background: #d0d0d0;
+    transform: scale(1.05);
+}
+
+.profile-avatar {
+    font-size: 80px;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.profile-info {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.profile-field {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.profile-field:last-child {
+    border-bottom: none;
+}
+
+.profile-field label {
+    font-weight: bold;
+    color: #555;
+}
+
+.profile-field span {
+    color: #333;
 }
