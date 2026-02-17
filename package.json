@@ -1,0 +1,22 @@
+{
+  "name": "testagent",
+  "version": "1.0.0",
+  "description": "Autonomous GitHub issue resolution agent",
+  "private": true,
+  "workspaces": [
+    "backend"
+  ],
+  "scripts": {
+    "test": "bash .github/scripts/tests/run-tests.sh",
+    "test:watch": "bats --watch .github/scripts/tests/",
+    "setup": "npm install && npm run setup:hooks",
+    "setup:hooks": "bash .github/scripts/tests/setup-hooks.sh"
+  },
+  "devDependencies": {
+    "bats": "^1.11.0",
+    "playwright": "^1.48.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -28,6 +28,11 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y $(cat .github/apt-packages.txt)
+
       - name: Cache Playwright browsers
         id: playwright-cache
         uses: actions/cache@v4
@@ -87,4 +92,4 @@ jobs:
           name: ralph-screenshots-issue-${{ github.event.issue.number }}
           path: screenshots/
           if-no-files-found: ignore
-          retention-days: 30
+          retention-days: 7
