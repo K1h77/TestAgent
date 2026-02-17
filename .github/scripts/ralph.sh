@@ -39,9 +39,9 @@ extract_summary() {
   local raw_output="$1"
   local marker="$2"  # e.g., "## Summary" or "## Review Summary"
   
-  # Extract content from marker to next ## heading or end of file
+  # Extract content from marker line to next ## heading or end of file
   echo "$raw_output" | awk -v marker="${marker}" '
-    $0 ~ "^" marker { found=1; next }
+    $0 == marker { found=1; next }
     found && /^## / { exit }
     found { print }
   ' | sed '/^$/d' | head -20
@@ -189,10 +189,16 @@ End your response with a section that starts with the line '## Summary' (on its 
   if [ -z "$CHANGED_FILES" ]; then
     CHANGED_FILES_DISPLAY="(No files changed yet - changes may be uncommitted)"
   else
-    FILE_COUNT=$(echo "$CHANGED_FILES" | wc -l)
+    # Count files properly (grep -c will count lines, or use array)
+    FILE_COUNT=$(echo "$CHANGED_FILES" | grep -c '^')
     if [ "$FILE_COUNT" -gt 10 ]; then
       # Show first 10 files and indicate there are more
-      CHANGED_FILES_DISPLAY="$(echo "$CHANGED_FILES" | head -10 | tr '\n' ' ' | sed 's/ $//')... and $((FILE_COUNT - 10)) more"
+      REMAINING=$((FILE_COUNT - 10))
+      if [ "$REMAINING" -eq 1 ]; then
+        CHANGED_FILES_DISPLAY="$(echo "$CHANGED_FILES" | head -10 | tr '\n' ' ' | sed 's/ $//')... and 1 more file"
+      else
+        CHANGED_FILES_DISPLAY="$(echo "$CHANGED_FILES" | head -10 | tr '\n' ' ' | sed 's/ $//')... and $REMAINING more files"
+      fi
     else
       CHANGED_FILES_DISPLAY="$(echo "$CHANGED_FILES" | tr '\n' ' ' | sed 's/ $//')"
     fi
