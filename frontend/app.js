@@ -5,6 +5,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('loginForm');
     const loginContainer = document.getElementById('loginContainer');
     const mainContainer = document.getElementById('mainContainer');
+    const userIcon = document.getElementById('userIcon');
+    const profileView = document.getElementById('profileView');
+    
+    userIcon.addEventListener('click', () => {
+        profileView.style.display = profileView.style.display === 'none' ? 'block' : 'none';
+    });
     
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
