@@ -39,12 +39,13 @@ extract_summary() {
   local raw_output="$1"
   local marker="$2"  # e.g., "## Summary" or "## Review Summary"
   
-  # Extract content between marker and next ## heading (or end of file)
-  echo "$raw_output" | sed -n "/^${marker}/,/^## /{
-    /^${marker}/d
-    /^## /d
-    p
-  }" | sed '/^$/d' | head -20
+  # Extract content from marker to next ## heading or end of file
+  # First, extract from marker to end, then stop at next ## heading
+  echo "$raw_output" | awk -v marker="^${marker}" '
+    $0 ~ marker { found=1; next }
+    found && /^## / { exit }
+    found { print }
+  ' | sed '/^$/d' | head -20
 }
 
 # ==========================================
