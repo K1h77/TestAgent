@@ -2,7 +2,7 @@
 
 RALPH_MODEL_ARCHITECT="openrouter/anthropic/claude-haiku-4.5"
 RALPH_MODEL_ARCHITECT_HARD="openrouter/anthropic/claude-sonnet-4.5"
-RALPH_MODEL_CODER="minimax/minimax-m2.5"
+RALPH_MODEL_CODER="openrouter/minimax/minimax-m2.5"
 RALPH_MODEL_REVIEWER="openrouter/anthropic/claude-haiku-4.5"
 
 RALPH_TEST_CMD_FRONTEND=""
