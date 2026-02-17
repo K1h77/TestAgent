@@ -22,6 +22,12 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
       - name: Cache Playwright browsers
         id: playwright-cache
         uses: actions/cache@v4
@@ -31,24 +37,14 @@ jobs:
           restore-keys: |
             playwright-${{ runner.os }}-
 
-      - name: Cache npm global packages
-        id: npm-cache
-        uses: actions/cache@v4
-        with:
-          # Cache global node_modules for the Node version specified in setup-node
-          path: /opt/hostedtoolcache/node/22.*/x64/lib/node_modules
-          key: npm-global-${{ runner.os }}-${{ hashFiles('.github/workflows/ralph.yaml') }}
-          restore-keys: |
-            npm-global-${{ runner.os }}-
+      - name: Install Playwright package
+        run: npm install --no-save playwright
 
-      - name: Install Playwright and dependencies
+      - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: |
-          npm install --no-save playwright
-          npx playwright install chromium --with-deps
+        run: npx playwright install chromium --with-deps
 
       - name: Install Aider
-        if: steps.npm-cache.outputs.cache-hit != 'true'
         run: pip install aider-chat==0.67.0
 
       - name: Remove ralph-retry label if present
