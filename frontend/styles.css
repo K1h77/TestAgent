@@ -260,7 +260,7 @@ button:active {
     cursor: pointer;
     border: none;
     padding: 0;
-    transition: background 0.2s;
+    transition: background 0.2s, transform 0.2s;
 }
 
 .close-btn:hover {
