@@ -15,7 +15,7 @@ if [ -z "$GITHUB_REPOSITORY" ]; then
 fi
 
 REPO="$GITHUB_REPOSITORY"
-MODEL="openrouter/deepseek/deepseek-r1"
+MODEL="openrouter/deepseek/deepseek-chat-v3-0324"
 # Maximum lines to include in PR description from coding output
 PR_SUMMARY_MAX_LINES=10
 echo "🤖 [RALPH] Waking up. Target: Issue #$ISSUE_NUMBER in $REPO"
@@ -52,6 +52,31 @@ Labels: {{range $i, $e := .labels}}{{if $i}}, {{end}}{{$e.name}}{{end}}
 echo "Issue details:"
 echo "$ISSUE_DETAILS"
 
+# Download images from issue body for the multimodal model
+ISSUE_IMAGES_DIR="/tmp/issue-images"
+mkdir -p "$ISSUE_IMAGES_DIR"
+IMAGE_ARGS=""
+IMG_COUNT=0
+
+# Extract markdown image URLs from issue body
+ISSUE_BODY=$(gh issue view "$ISSUE_NUMBER" --repo "$REPO" --json body --jq '.body // ""')
+while IFS= read -r img_url; do
+  if [ -n "$img_url" ]; then
+    IMG_COUNT=$((IMG_COUNT + 1))
+    IMG_FILE="$ISSUE_IMAGES_DIR/issue-image-$IMG_COUNT.png"
+    if curl -sL -o "$IMG_FILE" "$img_url" 2>/dev/null && [ -s "$IMG_FILE" ]; then
+      IMAGE_ARGS="$IMAGE_ARGS --read $IMG_FILE"
+      echo "📷 [RALPH] Downloaded issue image $IMG_COUNT: $img_url"
+    fi
+  fi
+done <<< "$(echo "$ISSUE_BODY" | grep -oP '!\[.*?\]\(\K[^)]+' || true)"
+
+if [ $IMG_COUNT -gt 0 ]; then
+  echo "📷 [RALPH] Found $IMG_COUNT image(s) in issue body"
+else
+  echo "📷 [RALPH] No images found in issue body"
+fi
+
 # ==========================================
 # 2. PLANNING PHASE
 # ==========================================
@@ -66,6 +91,8 @@ PROMPT_PLAN="I am an autonomous agent working on GitHub Issue #$ISSUE_NUMBER in 
 Here are the issue details:
 $ISSUE_DETAILS
 
+If there are images attached to this issue, they have been provided to you. Use them to understand the visual requirements.
+
 Your task:
 1. Read and understand the issue details above.
 2. Explore the codebase to understand the context.
@@ -79,7 +106,7 @@ IMPORTANT: You have access to Playwright for browser automation and visual testi
 
 Do NOT write code yet. Just output the plan."
 
-PLAN_OUTPUT=$(aider --yes --model "$MODEL" --message "$PROMPT_PLAN")
+PLAN_OUTPUT=$(aider --yes --model "$MODEL" $IMAGE_ARGS --message "$PROMPT_PLAN")
 
 echo "📝 [RALPH] Plan created:"
 echo "$PLAN_OUTPUT"
@@ -117,6 +144,8 @@ while [ $REVIEW_ROUND -le $MAX_REVIEW_ROUNDS ]; do
 Here are the issue details:
 $ISSUE_DETAILS
 
+If there are images attached to this issue, they have been provided to you. Use them to understand the visual requirements.
+
 Here is the plan:
 $PLAN_OUTPUT
 
@@ -136,6 +165,8 @@ Implement the ENTIRE plan in this single session."
     # Subsequent rounds: include reviewer feedback
     PROMPT_CODING="You are an autonomous agent working on GitHub Issue #$ISSUE_NUMBER in repository $REPO.
 
+If there are images attached to this issue, they have been provided to you. Use them to understand the visual requirements.
+
 Here is the original plan:
 $PLAN_OUTPUT
 
@@ -154,7 +185,7 @@ IMPORTANT: You have Playwright available for browser automation and visual testi
 Address ALL reviewer concerns in this session."
   fi
   
-  CODING_OUTPUT=$(aider --yes --model "$MODEL" --message "$PROMPT_CODING")
+  CODING_OUTPUT=$(aider --yes --model "$MODEL" $IMAGE_ARGS --message "$PROMPT_CODING")
   
   echo "✅ [RALPH] Coding complete for round $REVIEW_ROUND"
   echo "$CODING_OUTPUT"
@@ -167,36 +198,25 @@ $CODING_OUTPUT"
   # ==========================================
   # 3.1.1. VISUAL CHECK (if app exists)
   # ==========================================
+  # Take screenshots for visual verification
   VISUAL_SUMMARY=""
-  
-  if [ -f "$REPO_ROOT/backend/server.js" ]; then
-    echo "🎭 [RALPH] Running visual check (optional)..."
-    
-    # Create a unique temp file for visual check output
-    VISUAL_CHECK_OUTPUT=$(mktemp /tmp/ralph-visual-check-XXXXXX.txt)
-    
-    # Try to run visual check, but don't fail if it doesn't work
-    if bash .github/scripts/playwright-screenshot.sh 2>&1 | tee "$VISUAL_CHECK_OUTPUT"; then
-      VISUAL_SUMMARY=$(cat "$VISUAL_CHECK_OUTPUT")
-      echo "✅ [RALPH] Visual check completed"
-      
-      # Post visual summary as issue comment
-      post_comment "## Visual Check Results (Round $REVIEW_ROUND)
+  SCREENSHOT_ARGS=""
+  echo "🎭 [RALPH] Taking screenshots..."
+  if bash .github/scripts/playwright-screenshot.sh 2>&1 | tee /tmp/ralph-visual-output.txt; then
+    VISUAL_SUMMARY=$(cat /tmp/ralph-visual-output.txt)
+    # Collect screenshot files for the multimodal reviewer
+    for img in "$REPO_ROOT"/screenshots/*.png; do
+      [ -f "$img" ] && SCREENSHOT_ARGS="$SCREENSHOT_ARGS --read $img"
+    done
+    echo "✅ [RALPH] Screenshots taken"
+    post_comment "## Visual Check (Round $REVIEW_ROUND)
 
-📸 **Screenshots will be available as workflow artifacts:**
-https://github.com/$REPO/actions/runs/$GITHUB_RUN_ID
-
-\`\`\`
-$VISUAL_SUMMARY
-\`\`\`"
-    else
-      echo "⚠️  [RALPH] Visual check failed or not applicable - continuing with code-only review"
-      VISUAL_SUMMARY="Visual check was attempted but failed (this is okay - may not be a visual issue)"
-    fi
-    
-    # Clean up temp file
-    rm -f "$VISUAL_CHECK_OUTPUT"
+📸 Screenshots available in workflow artifacts:
+https://github.com/$REPO/actions/runs/$GITHUB_RUN_ID"
+  else
+    echo "⚠️ [RALPH] Screenshots failed - continuing without visual check"
   fi
+  rm -f /tmp/ralph-visual-output.txt
   
   # ==========================================
   # 3.2. REVIEW STEP
@@ -224,22 +244,31 @@ $VISUAL_SUMMARY
   # Fallback to diff without HEAD reference for repos without HEAD (initial commits)
   DIFF_OUTPUT=$(git --no-pager diff --cached HEAD 2>/dev/null || git --no-pager diff --cached)
   
-  # Build review prompt with optional visual summary
-  if [ -n "$VISUAL_SUMMARY" ]; then
-    PROMPT_REVIEW="You are a Senior Code Reviewer reviewing changes for GitHub Issue #$ISSUE_NUMBER in repository $REPO.
+  # Build review prompt
+  PROMPT_REVIEW="You are a Senior Code Reviewer reviewing changes for GitHub Issue #$ISSUE_NUMBER in repository $REPO.
 
 Here are the issue details:
 $ISSUE_DETAILS
 
+If there are images attached to this issue, they have been provided to you. Use them to understand the visual requirements.
+
 Here are the code changes:
 \`\`\`diff
 $DIFF_OUTPUT
-\`\`\`
+\`\`\`"
 
-Visual Check Results (if this is a UI/styling issue):
+  if [ -n "$VISUAL_SUMMARY" ]; then
+    PROMPT_REVIEW="$PROMPT_REVIEW
+
+Visual Check Results:
+Screenshots have been taken and are available for your review. Use them to verify the visual correctness of the changes.
+
 \`\`\`
 $VISUAL_SUMMARY
-\`\`\`
+\`\`\`"
+  fi
+
+  PROMPT_REVIEW="$PROMPT_REVIEW
 
 Your task:
 1. Review the changes against the issue requirements.
@@ -253,31 +282,8 @@ IMPORTANT - Keep your response CONCISE and UNDERSTANDABLE:
 - For issues: 3-5 bullet points maximum, each clearly stating the problem
 
 Be thorough but fair. Output ONLY 'LGTM' (with brief reasoning) or the concise list of issues."
-  else
-    PROMPT_REVIEW="You are a Senior Code Reviewer reviewing changes for GitHub Issue #$ISSUE_NUMBER in repository $REPO.
-
-Here are the issue details:
-$ISSUE_DETAILS
-
-Here are the code changes:
-\`\`\`diff
-$DIFF_OUTPUT
-\`\`\`
-
-Your task:
-1. Review the changes against the issue requirements.
-2. Check for bugs, security issues, code quality problems, and missing functionality.
-3. If the code is good and fully addresses the issue, output EXACTLY: 'LGTM'
-4. If there are issues, output a detailed numbered list of problems that MUST be fixed.
-
-IMPORTANT - Keep your response CONCISE and UNDERSTANDABLE:
-- For LGTM: Maximum 2-3 sentences explaining why it looks good
-- For issues: 3-5 bullet points maximum, each clearly stating the problem
-
-Be thorough but fair. Output ONLY 'LGTM' (with brief reasoning) or the concise list of issues."
-  fi
   
-  REVIEW_OUTPUT=$(aider --yes --model "$MODEL" --message "$PROMPT_REVIEW")
+  REVIEW_OUTPUT=$(aider --yes --model "$MODEL" $IMAGE_ARGS $SCREENSHOT_ARGS --message "$PROMPT_REVIEW")
   
   echo "📋 [RALPH] Review result:"
   echo "$REVIEW_OUTPUT"
