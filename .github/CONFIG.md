@@ -10,17 +10,21 @@ The `configure-ralph` file contains all configuration values used across Ralph's
 
 ### AI Models
 
-- **`RALPH_MODEL_ARCHITECT`** (default: `openrouter/anthropic/claude-haiku-4-5`)  
+**Important: Model ID Format Rules**
+- **Models used by Aider** (`RALPH_MODEL_ARCHITECT`, `RALPH_MODEL_ARCHITECT_HARD`, `RALPH_MODEL_CODER`): Must include the `openrouter/` prefix (e.g., `openrouter/anthropic/claude-haiku-4.5`). Aider uses this prefix to route requests through OpenRouter when `OPENROUTER_API_KEY` is set.
+- **Models used by direct API calls** (`RALPH_MODEL_REVIEWER`): Must NOT include the `openrouter/` prefix (e.g., `anthropic/claude-haiku-4.5`). Direct curl requests to `openrouter.ai/api/v1/chat/completions` use the provider/model format without the routing prefix.
+
+- **`RALPH_MODEL_ARCHITECT`** (default: `openrouter/anthropic/claude-haiku-4.5`)  
   Multi-modal AI model used as the architect/planner in aider's architect mode. This model can see images directly.
 
-- **`RALPH_MODEL_ARCHITECT_HARD`** (default: `openrouter/anthropic/claude-sonnet-4-5`)  
+- **`RALPH_MODEL_ARCHITECT_HARD`** (default: `openrouter/anthropic/claude-sonnet-4.5`)  
   Upgraded architect model used when the issue has a `hard` label. Automatically swaps in for more complex problems that need stronger reasoning.
 
 - **`RALPH_MODEL_CODER`** (default: `openrouter/minimax/minimax-m2.5`)  
   AI model used as the editor (code writer) in aider's architect mode.
 
-- **`RALPH_MODEL_REVIEWER`** (default: `openrouter/anthropic/claude-haiku-4-5`)  
-  AI model used for code review.
+- **`RALPH_MODEL_REVIEWER`** (default: `anthropic/claude-haiku-4.5`)  
+  AI model used for code review. Called directly via OpenRouter API, so no `openrouter/` prefix is needed.
 
 ### Test Command Mapping
 
