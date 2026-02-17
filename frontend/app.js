@@ -144,7 +144,7 @@ function escapeHtml(text) {
 // Toggle profile modal visibility
 function toggleProfile() {
     const profileModal = document.getElementById('profileModal');
-    if (profileModal.style.display === 'none') {
+    if (profileModal.style.display === 'none' || profileModal.style.display === '') {
         profileModal.style.display = 'flex';
     } else {
         profileModal.style.display = 'none';
