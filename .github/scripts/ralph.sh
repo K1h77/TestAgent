@@ -112,7 +112,6 @@ echo "✅ [RALPH] Created branch: $BRANCH_NAME"
 MAX_REVIEW_ROUNDS=3
 REVIEW_ROUND=1
 REVIEWER_FEEDBACK=""
-FINAL_VISUAL_SUMMARY=""
 
 # Save initial commit SHA before any changes
 INITIAL_SHA=$(git rev-parse HEAD)
@@ -138,11 +137,11 @@ Your task:
 3. Implement the changes to solve the issue.
 4. Make sure your changes follow best practices and would pass tests.
 
-IMPORTANT: You have Playwright available for browser automation and visual testing.
-- For UI/styling/visual tasks, use '.github/scripts/playwright-screenshot.sh' to verify your changes visually.
-- The script will start the app, take screenshots, and generate a text summary of the visual state.
-- Use this to ensure your CSS/HTML changes look correct before finishing.
-- Run 'node .github/scripts/visual-check.js' directly if you need more control over the visual testing.
+IMPORTANT: You MUST run visual verification for any UI/frontend changes.
+- After implementing your changes, you MUST run '.github/scripts/playwright-screenshot.sh' to take screenshots of the app.
+- This is REQUIRED - the screenshots will be used to verify your work.
+- The script will start the app servers, take screenshots, and save them to the screenshots/ directory.
+- Do NOT skip this step for any UI-related changes.
 
 End your response with a section that starts with the line '## Summary' (on its own line). In this section, write 2-4 sentences explaining what you changed and why, as if you're a developer posting a progress update to your team. Keep it casual and clear."
   else
@@ -161,9 +160,9 @@ Your task:
 1. Fix ALL the issues mentioned by the reviewer.
 2. Make sure your fixes follow best practices.
 
-IMPORTANT: You have Playwright available for browser automation and visual testing.
-- For UI/styling/visual issues, use '.github/scripts/playwright-screenshot.sh' to verify your fixes.
-- The script will generate screenshots and a text summary of the visual state.
+IMPORTANT: You MUST run visual verification for any UI/frontend changes.
+- After implementing your fixes, you MUST run '.github/scripts/playwright-screenshot.sh' to take screenshots.
+- This is REQUIRED - the screenshots will be used to verify your work.
 
 End your response with a section that starts with the line '## Summary' (on its own line). In this section, write 2-4 sentences explaining what you fixed and why, as if you're a developer posting a progress update to your team. Keep it casual and clear."
   fi
@@ -214,27 +213,91 @@ $CODING_SUMMARY
 **Files changed:** \`$CHANGED_FILES_DISPLAY\`"
   
   # ==========================================
-  # 3.1.1. VISUAL CHECK (if app exists)
+  # 3.1.1. CLEAN UP SCREENSHOTS FROM GIT
   # ==========================================
-  # Take screenshots for visual verification
-  VISUAL_SUMMARY=""
+  # Remove any screenshots that may have been staged/committed
+  echo "🧹 [RALPH] Cleaning up screenshots from git..."
+  git rm --cached screenshots/ 2>/dev/null || true
+  git checkout -- .gitignore 2>/dev/null || true
+  
+  # ==========================================
+  # 3.1.2. UPLOAD SCREENSHOTS TO ISSUE COMMENTS
+  # ==========================================
   SCREENSHOT_ARGS=""
-  echo "🎭 [RALPH] Taking screenshots..."
-  if bash .github/scripts/playwright-screenshot.sh 2>&1 | tee /tmp/ralph-visual-output.txt; then
-    VISUAL_SUMMARY=$(cat /tmp/ralph-visual-output.txt)
-    # Collect screenshot files for the multimodal reviewer
-    for img in "$REPO_ROOT"/screenshots/*.png; do
-      [ -f "$img" ] && SCREENSHOT_ARGS="$SCREENSHOT_ARGS --read $img"
-    done
-    echo "✅ [RALPH] Screenshots taken"
-    post_comment "## Visual Check (Round $REVIEW_ROUND)
+  SCREENSHOTS_EXIST=false
+  
+  if [ -d "$REPO_ROOT/screenshots" ] && [ "$(ls -A "$REPO_ROOT/screenshots"/*.png 2>/dev/null)" ]; then
+    echo "📸 [RALPH] Found screenshots, uploading to issue..."
+    SCREENSHOTS_EXIST=true
+    
+    # Build comment with uploaded images
+    SCREENSHOT_COMMENT="## Screenshots (Round $REVIEW_ROUND)"
+    SCREENSHOT_COMMENT="$SCREENSHOT_COMMENT
 
-📸 Screenshots available in workflow artifacts:
-https://github.com/$REPO/actions/runs/$GITHUB_RUN_ID"
+Screenshots captured after coding changes:
+"
+    
+    # Upload each screenshot and build markdown
+    for screenshot_file in "$REPO_ROOT"/screenshots/*.png; do
+      if [ -f "$screenshot_file" ]; then
+        filename=$(basename "$screenshot_file")
+        echo "  Uploading $filename..."
+        
+        # Try to upload to GitHub using issue comment attachments
+        # The most reliable method is to use GitHub's upload-asset endpoint
+        # First, we'll try to create a temporary release tag for storing images
+        TEMP_TAG="screenshots-issue-${ISSUE_NUMBER}-round-${REVIEW_ROUND}-$(date +%s)"
+        IMAGE_URL=""
+        
+        # Create a lightweight tag and release for storing screenshots
+        if gh release create "$TEMP_TAG" --repo "$REPO" --title "Screenshots for Issue #$ISSUE_NUMBER" --notes "Temporary release for screenshot storage" --target "$BRANCH_NAME" 2>&1 | tee -a /tmp/ralph-upload.log; then
+          # Upload screenshot as release asset
+          if gh release upload "$TEMP_TAG" "$screenshot_file" --repo "$REPO" --clobber 2>&1 | tee -a /tmp/ralph-upload.log; then
+            # Get the asset URL
+            IMAGE_URL=$(gh api "repos/$REPO/releases/tags/$TEMP_TAG" --jq ".assets[] | select(.name == \"$filename\") | .browser_download_url" 2>/dev/null)
+          fi
+        fi
+        
+        # If upload succeeded, embed the image
+        if [ -n "$IMAGE_URL" ]; then
+          SCREENSHOT_COMMENT="$SCREENSHOT_COMMENT
+![${filename}](${IMAGE_URL})"
+          echo "  ✓ Uploaded: $IMAGE_URL"
+        else
+          # Fallback to artifact reference
+          SCREENSHOT_COMMENT="$SCREENSHOT_COMMENT
+- 📸 \`$filename\`"
+          echo "  ⚠ Could not upload, will reference artifact instead"
+        fi
+        
+        # Collect screenshot files for the multimodal reviewer
+        SCREENSHOT_ARGS="$SCREENSHOT_ARGS --read $screenshot_file"
+      fi
+    done
+    
+    SCREENSHOT_COMMENT="$SCREENSHOT_COMMENT
+
+View all screenshots in [workflow artifacts](https://github.com/$REPO/actions/runs/$GITHUB_RUN_ID) if images don't load above."
+    
+    post_comment "$SCREENSHOT_COMMENT"
+    echo "✅ [RALPH] Screenshots uploaded to issue"
+    
+    # Clean up old screenshot releases (older than 7 days)
+    echo "🧹 [RALPH] Cleaning up old screenshot releases..."
+    SEVEN_DAYS_AGO=$(date -d '7 days ago' +%s 2>/dev/null || date -v-7d +%s 2>/dev/null || date +%s)
+    gh api "repos/$REPO/releases" --paginate --jq '.[] | select(.tag_name | startswith("screenshots-issue-")) | "\(.tag_name)|\(.id)|\(.created_at)"' 2>/dev/null | \
+    while IFS='|' read -r TAG ID CREATED; do
+      if [ -n "$TAG" ]; then
+        CREATED_TS=$(date -d "$CREATED" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$CREATED" +%s 2>/dev/null || date +%s)
+        if [ "$CREATED_TS" -lt "$SEVEN_DAYS_AGO" ]; then
+          echo "  Deleting old release: $TAG (created $CREATED)"
+          gh release delete "$TAG" --repo "$REPO" --yes 2>/dev/null || true
+        fi
+      fi
+    done || true
   else
-    echo "⚠️ [RALPH] Screenshots failed - continuing without visual check"
+    echo "ℹ️  [RALPH] No screenshots found in screenshots/ directory"
   fi
-  rm -f /tmp/ralph-visual-output.txt
   
   # ==========================================
   # 3.2. REVIEW STEP
@@ -278,15 +341,16 @@ Here are the code changes:
 $DIFF_OUTPUT
 \`\`\`"
 
-  if [ -n "$VISUAL_SUMMARY" ]; then
+  if [ "$SCREENSHOTS_EXIST" = true ]; then
     PROMPT_REVIEW="$PROMPT_REVIEW
 
-Visual Check Results:
-Screenshots have been taken and are available for your review. Use them to verify the visual correctness of the changes.
+Visual Verification:
+Screenshots of the application have been provided to you for review. Use them to verify the visual correctness of the changes."
+  else
+    PROMPT_REVIEW="$PROMPT_REVIEW
 
-\`\`\`
-$VISUAL_SUMMARY
-\`\`\`"
+Visual Verification:
+No visual verification was performed for this round. Review based on code changes only. Do NOT claim you verified the visual appearance."
   fi
 
   PROMPT_REVIEW="$PROMPT_REVIEW
@@ -294,7 +358,7 @@ $VISUAL_SUMMARY
 Your task:
 1. Review the changes against the issue requirements.
 2. Check for bugs, security issues, code quality problems, and missing functionality.
-3. For UI/styling issues, consider the visual check results - do the changes produce the expected visual output?
+3. For UI/styling issues, consider whether visual verification is needed and available.
 4. If the code is good and fully addresses the issue (including visual correctness if applicable), output EXACTLY: 'LGTM'
 5. If there are issues, output a detailed numbered list of problems that MUST be fixed.
 
@@ -324,11 +388,6 @@ $REVIEW_SUMMARY"
   # Check if review passed
   if [[ "$REVIEW_OUTPUT" == *"LGTM"* ]]; then
     echo "✅ [RALPH] Review passed!"
-    
-    # Preserve visual summary from this successful round for PR body
-    if [ -n "$VISUAL_SUMMARY" ]; then
-      FINAL_VISUAL_SUMMARY="$VISUAL_SUMMARY"
-    fi
     
     # ==========================================
     # 4. PUSH BRANCH AND CREATE PR
@@ -363,9 +422,8 @@ $BRIEF_SUMMARY
 ## Review Status
 ✅ Code review passed
 
-## Visual Check
-📸 Screenshots available in workflow artifacts:
-https://github.com/$REPO/actions/runs/$GITHUB_RUN_ID"
+## Screenshots
+See issue comments for visual verification screenshots, or download from [workflow artifacts](https://github.com/$REPO/actions/runs/$GITHUB_RUN_ID)"
     
     gh pr create \
       --repo "$REPO" \
