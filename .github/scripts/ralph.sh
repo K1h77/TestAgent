@@ -246,7 +246,7 @@ Screenshots captured after coding changes:
         # Try to upload to GitHub using issue comment attachments
         # The most reliable method is to use GitHub's upload-asset endpoint
         # First, we'll try to create a temporary release tag for storing images
-        TEMP_TAG="screenshots-issue-${ISSUE_NUMBER}-$(date +%s)"
+        TEMP_TAG="screenshots-issue-${ISSUE_NUMBER}-round-${REVIEW_ROUND}-$(date +%s)"
         IMAGE_URL=""
         
         # Create a lightweight tag and release for storing screenshots
@@ -281,6 +281,21 @@ View all screenshots in [workflow artifacts](https://github.com/$REPO/actions/ru
     
     post_comment "$SCREENSHOT_COMMENT"
     echo "✅ [RALPH] Screenshots uploaded to issue"
+    
+    # Clean up old screenshot releases (older than 7 days)
+    echo "🧹 [RALPH] Cleaning up old screenshot releases..."
+    SEVEN_DAYS_AGO=$(date -d '7 days ago' +%s 2>/dev/null || date -v-7d +%s 2>/dev/null || echo "0")
+    gh api "repos/$REPO/releases" --paginate --jq '.[] | select(.tag_name | startswith("screenshots-issue-")) | {tag: .tag_name, id: .id, created: .created_at}' | \
+    while read -r release_data; do
+      TAG=$(echo "$release_data" | jq -r '.tag')
+      ID=$(echo "$release_data" | jq -r '.id')
+      CREATED=$(echo "$release_data" | jq -r '.created')
+      CREATED_TS=$(date -d "$CREATED" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$CREATED" +%s 2>/dev/null || echo "0")
+      if [ "$CREATED_TS" -lt "$SEVEN_DAYS_AGO" ] && [ "$CREATED_TS" != "0" ]; then
+        echo "  Deleting old release: $TAG (created $CREATED)"
+        gh release delete "$TAG" --repo "$REPO" --yes 2>/dev/null || true
+      fi
+    done 2>/dev/null || true
   else
     echo "ℹ️  [RALPH] No screenshots found in screenshots/ directory"
   fi
