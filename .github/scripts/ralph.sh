@@ -14,7 +14,7 @@ validate_environment() {
     exit 1
   fi
   if [ -z "$OPENROUTER_API_KEY" ]; then
-    echo "❌ Error: OPENROUTER_API_KEY env var missing. Required for aider and review API calls."
+    echo "❌ Error: OPENROUTER_API_KEY env var missing. Required for aider API calls."
     exit 1
   fi
   
@@ -31,12 +31,6 @@ validate_environment() {
   # Validate aider is available
   if ! command -v aider &>/dev/null; then
     echo "❌ Error: aider is not installed or not in PATH."
-    exit 1
-  fi
-  
-  # Validate jq is available (used for review API)
-  if ! command -v jq &>/dev/null; then
-    echo "❌ Error: jq is not installed or not in PATH. Required for review API calls."
     exit 1
   fi
 }
@@ -254,7 +248,10 @@ IMPORTANT: Focus on test quality:
 End your response with a section that starts with the line '## Summary' (on its own line). Briefly describe what tests you added/removed and why."
   
   # Run aider without --auto-test (we expect tests to fail at this stage)
-  eval "aider --yes-always --architect --model \"$MODEL_ARCHITECT\" --editor-model \"$MODEL_CODER\" $ISSUE_IMAGE_FLAGS --message \"$test_prompt\""
+  local test_prompt_file=$(mktemp)
+  echo "$test_prompt" > "$test_prompt_file"
+  eval "aider --yes-always --no-check-update --architect --model \"$MODEL_ARCHITECT\" --editor-model \"$MODEL_CODER\" $ISSUE_IMAGE_FLAGS --message-file \"$test_prompt_file\""
+  rm -f "$test_prompt_file"
   
   local test_summary="Test scaffolding complete. Tests have been prepared to capture the acceptance criteria."
   post_comment "🧪 **Test Scaffolding Complete**
@@ -325,8 +322,13 @@ End your response with a section that starts with the line '## Summary' (on its 
 
 run_aider_coding() {
   local prompt="$1"
+  local prompt_file=$(mktemp)
+  echo "$prompt" > "$prompt_file"
+  
   local aider_exit_code=0
-  eval "aider --yes-always --architect --model \"$MODEL_ARCHITECT\" --editor-model \"$MODEL_CODER\" $ISSUE_IMAGE_FLAGS $AIDER_TEST_FLAGS --message \"$prompt\"" || aider_exit_code=$?
+  eval "aider --yes-always --no-check-update --architect --model \"$MODEL_ARCHITECT\" --editor-model \"$MODEL_CODER\" $ISSUE_IMAGE_FLAGS $AIDER_TEST_FLAGS --message-file \"$prompt_file\"" || aider_exit_code=$?
+  
+  rm -f "$prompt_file"
   
   if [ $aider_exit_code -ne 0 ]; then
     echo "⚠️  [RALPH] Aider exited with code $aider_exit_code. It may have encountered an error."
@@ -531,8 +533,18 @@ get_diff_output() {
   echo "$diff"
 }
 
-build_base_review_prompt() {
+build_review_prompt() {
   local diff_output="$1"
+
+  local visual_section
+  if [ "$SCREENSHOTS_EXIST" = true ]; then
+    visual_section="Visual Verification:
+Screenshots of the application have been provided to you for review. Use them to verify the visual correctness of the changes."
+  else
+    visual_section="Visual Verification:
+No visual verification was performed for this round. Review based on code changes only. Do NOT claim you verified the visual appearance."
+  fi
+
   echo "You are a Senior Code Reviewer reviewing changes for GitHub Issue #$ISSUE_NUMBER in repository $REPO.
 
 Here are the issue details:
@@ -543,176 +555,28 @@ If there are images attached to this issue, they have been provided to you. Use 
 Here are the code changes:
 \`\`\`diff
 $diff_output
-\`\`\`"
-}
+\`\`\`
 
-append_visual_verification() {
-  local prompt="$1"
-  if [ "$SCREENSHOTS_EXIST" = true ]; then
-    echo "$prompt
+IMPORTANT CONTEXT: You have access to the full codebase via the repo map. Use it to verify:
+- Whether the changes are complete (all relevant files modified)
+- Whether hover states, focus states, and other interactive elements are also updated
+- Whether the changes are consistent with the rest of the codebase
 
-Visual Verification:
-Screenshots of the application have been provided to you for review. Use them to verify the visual correctness of the changes."
-  else
-    echo "$prompt
-
-Visual Verification:
-No visual verification was performed for this round. Review based on code changes only. Do NOT claim you verified the visual appearance."
-  fi
-}
-
-append_review_instructions() {
-  local prompt="$1"
-  echo "$prompt
+$visual_section
 
 Your task:
 1. Review the changes against the issue requirements.
-2. Check for bugs, security issues, code quality problems, and missing functionality.
-3. For UI/styling issues, consider whether visual verification is needed and available.
-4. If the code is good and fully addresses the issue (including visual correctness if applicable), output EXACTLY: 'LGTM'
-5. If there are issues, output a detailed numbered list of problems that MUST be fixed.
+2. Use the repo map to check for completeness — are ALL relevant files updated?
+3. Check for bugs, security issues, code quality problems, and missing functionality.
+4. For UI/styling issues, consider whether visual verification is needed and available.
+5. If the code is good and fully addresses the issue (including visual correctness if applicable), output EXACTLY on its own line: 'LGTM'
+6. If there are issues, output a detailed numbered list of problems that MUST be fixed.
 
 End your response with a section that starts with the line '## Review Summary' (on its own line). In this section:
 - If LGTM: Write 2-3 sentences explaining why it looks good
 - If issues found: Write 3-5 bullet points maximum, each clearly stating the problem
 
 Be thorough but fair. Make sure to include the '## Review Summary' section at the end of your response."
-}
-
-build_review_content_json() {
-  local prompt_review="$1"
-  
-  if [ -z "$prompt_review" ]; then
-    echo "❌ [RALPH] Cannot build review JSON: review prompt is empty." >&2
-    return 1
-  fi
-  
-  local json_output
-  json_output=$(jq -n --arg text "$prompt_review" '[{"type": "text", "text": $text}]' 2>&1) || {
-    echo "❌ [RALPH] jq failed to build review content JSON: $json_output" >&2
-    return 1
-  }
-  
-  echo "$json_output"
-}
-
-attach_screenshots_to_review() {
-  local review_content="$1"
-  if [ "$SCREENSHOTS_EXIST" != true ]; then
-    echo "$review_content"
-    return
-  fi
-  
-  for screenshot_file in "$REPO_ROOT"/screenshots/*.png; do
-    if [ -f "$screenshot_file" ]; then
-      local base64_img=$(base64 -w 0 "$screenshot_file" 2>/dev/null || base64 -i "$screenshot_file" 2>/dev/null)
-      review_content=$(echo "$review_content" | jq --arg img "data:image/png;base64,$base64_img" '. + [{"type": "image_url", "image_url": {"url": $img}}]')
-      echo "  📷 Attached screenshot: $(basename "$screenshot_file")" >&2
-    fi
-  done
-  echo "$review_content"
-}
-
-attach_issue_images_to_review() {
-  local review_content="$1"
-  if [ ! -d "$ISSUE_IMAGES_DIR" ]; then
-    echo "$review_content"
-    return
-  fi
-  
-  for img_file in "$ISSUE_IMAGES_DIR"/*.png; do
-    if [ -f "$img_file" ]; then
-      local base64_img=$(base64 -w 0 "$img_file" 2>/dev/null || base64 -i "$img_file" 2>/dev/null)
-      review_content=$(echo "$review_content" | jq --arg img "data:image/png;base64,$base64_img" '. + [{"type": "image_url", "image_url": {"url": $img}}]')
-      echo "  📷 Attached issue image: $(basename "$img_file")" >&2
-    fi
-  done
-  echo "$review_content"
-}
-
-call_review_api() {
-  local review_content="$1"
-  
-  # Validate API key
-  if [ -z "$OPENROUTER_API_KEY" ]; then
-    echo "❌ [RALPH] OPENROUTER_API_KEY is not set. Cannot call review API." >&2
-    echo '{"error": "OPENROUTER_API_KEY not set"}'
-    return 1
-  fi
-  
-  local api_payload_file=$(mktemp)
-  if ! jq -n \
-    --arg model "$MODEL_REVIEWER" \
-    --argjson content "$review_content" \
-    '{
-      model: $model,
-      messages: [{"role": "user", "content": $content}]
-    }' > "$api_payload_file" 2>&1; then
-    echo "❌ [RALPH] Failed to build review API payload (jq error)." >&2
-    rm -f "$api_payload_file"
-    echo '{"error": "Failed to build API payload"}'
-    return 1
-  fi
-  
-  local http_code
-  local response_file=$(mktemp)
-  http_code=$(curl -s -w '%{http_code}' -o "$response_file" \
-    "${RALPH_OPENROUTER_API_URL:-https://openrouter.ai/api/v1/chat/completions}" \
-    -H "Authorization: Bearer $OPENROUTER_API_KEY" \
-    -H "Content-Type: application/json" \
-    -d @"$api_payload_file")
-  
-  local review_response
-  review_response=$(cat "$response_file")
-  rm -f "$api_payload_file" "$response_file"
-  
-  if [ -z "$http_code" ] || [ "$http_code" -ge 400 ] 2>/dev/null; then
-    echo "❌ [RALPH] Review API returned HTTP $http_code." >&2
-    echo "$review_response" | jq . 2>/dev/null >&2 || echo "$review_response" >&2
-  fi
-  
-  # Validate response is valid JSON
-  if ! echo "$review_response" | jq . >/dev/null 2>&1; then
-    echo "❌ [RALPH] Review API returned invalid JSON." >&2
-    echo "   Raw response (first 500 chars): $(echo "$review_response" | head -c 500)" >&2
-    echo '{"error": "Invalid JSON response from API"}'
-    return 1
-  fi
-  
-  # Check for API-level errors in the response body
-  local api_error
-  api_error=$(echo "$review_response" | jq -r '.error.message // empty' 2>/dev/null)
-  if [ -n "$api_error" ]; then
-    echo "❌ [RALPH] Review API error: $api_error" >&2
-  fi
-  
-  echo "$review_response"
-}
-
-extract_review_content() {
-  local review_response="$1"
-  local review_output
-  review_output=$(echo "$review_response" | jq -r '.choices[0].message.content // empty' 2>/dev/null)
-  
-  if [ -z "$review_output" ]; then
-    echo "❌ [RALPH] Reviewer API returned no content." >&2
-    
-    # Check for specific error patterns
-    local api_error
-    api_error=$(echo "$review_response" | jq -r '.error.message // empty' 2>/dev/null)
-    if [ -n "$api_error" ]; then
-      echo "❌ [RALPH] API error: $api_error" >&2
-    else
-      echo "❌ [RALPH] Raw response:" >&2
-      echo "$review_response" | jq . 2>/dev/null >&2 || echo "$review_response" >&2
-    fi
-    
-    # Return a structured failure message that won't accidentally match LGTM
-    echo "REVIEW_API_FAILURE: Reviewer returned no content. This is not an approval."
-    return 1
-  fi
-  
-  echo "$review_output"
 }
 
 post_review_summary() {
@@ -741,34 +605,35 @@ perform_review() {
     return
   fi
   
-  PROMPT_REVIEW=$(build_base_review_prompt "$DIFF_OUTPUT")
-  PROMPT_REVIEW=$(append_visual_verification "$PROMPT_REVIEW")
-  PROMPT_REVIEW=$(append_review_instructions "$PROMPT_REVIEW")
+  # Build review prompt and write to temp file (avoids shell interpretation of special chars)
+  local review_prompt_file=$(mktemp)
+  build_review_prompt "$DIFF_OUTPUT" > "$review_prompt_file"
   
-  echo "🧐 [RALPH] Calling $MODEL_REVIEWER via OpenRouter API..."
-  REVIEW_CONTENT=$(build_review_content_json "$PROMPT_REVIEW")
-  if [ -z "$REVIEW_CONTENT" ] || [ "$REVIEW_CONTENT" = "null" ]; then
-    echo "❌ [RALPH] Failed to build review content JSON."
-    REVIEW_OUTPUT="REVIEW_FAILED: Could not construct review payload."
-    post_comment "❌ **Review Failed (Round $REVIEW_ROUND)**: Internal error building review payload."
-    return
+  # Build read flags for screenshots (reviewer sees but does not edit)
+  local review_read_flags=""
+  if [ "$SCREENSHOTS_EXIST" = true ]; then
+    for screenshot_file in "$REPO_ROOT"/screenshots/*.png; do
+      if [ -f "$screenshot_file" ]; then
+        review_read_flags="$review_read_flags --read \"$screenshot_file\""
+      fi
+    done
   fi
   
-  REVIEW_CONTENT=$(attach_screenshots_to_review "$REVIEW_CONTENT")
-  REVIEW_CONTENT=$(attach_issue_images_to_review "$REVIEW_CONTENT")
+  echo "🧐 [RALPH] Reviewing with $MODEL_REVIEWER via aider (codebase-aware)..."
   
-  REVIEW_RESPONSE=$(call_review_api "$REVIEW_CONTENT")
-  if [ $? -ne 0 ]; then
-    echo "❌ [RALPH] Review API call failed."
-    REVIEW_OUTPUT="REVIEW_FAILED: API call returned an error. This is not an approval."
-    post_comment "❌ **Review Failed (Round $REVIEW_ROUND)**: Could not reach the review API. Check OPENROUTER_API_KEY and network connectivity."
-    return
+  local review_exit_code=0
+  REVIEW_OUTPUT=$(eval "aider --yes-always --no-check-update --chat-mode ask --model \"$MODEL_REVIEWER\" $ISSUE_IMAGE_FLAGS $review_read_flags --message-file \"$review_prompt_file\"") || review_exit_code=$?
+  
+  rm -f "$review_prompt_file"
+  
+  if [ $review_exit_code -ne 0 ]; then
+    echo "⚠️  [RALPH] Reviewer exited with code $review_exit_code."
   fi
   
-  REVIEW_OUTPUT=$(extract_review_content "$REVIEW_RESPONSE")
-  if [ $? -ne 0 ]; then
-    echo "❌ [RALPH] Reviewer returned no usable content."
-    post_comment "❌ **Review Failed (Round $REVIEW_ROUND)**: Reviewer API returned empty or invalid response."
+  if [ -z "$REVIEW_OUTPUT" ]; then
+    echo "❌ [RALPH] Reviewer produced no output."
+    REVIEW_OUTPUT="REVIEW_FAILED: Reviewer returned no content. This is not an approval."
+    post_comment "❌ **Review Failed (Round $REVIEW_ROUND)**: Reviewer produced no output."
     return
   fi
   
