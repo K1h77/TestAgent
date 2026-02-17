@@ -45,7 +45,7 @@ jobs:
         run: npx playwright install chromium --with-deps
 
       - name: Install Aider
-        run: pip install aider-chat==0.67.0
+        run: pip install -r requirements.txt
 
       - name: Remove ralph-retry label if present
         if: contains(github.event.issue.labels.*.name, 'ralph-retry')
