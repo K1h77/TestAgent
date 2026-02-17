@@ -187,20 +187,23 @@ End your response with a section that starts with the line '## Summary' (on its 
   # Also list which files were changed (since this round started)
   CHANGED_FILES=$(git diff --name-only "$BEFORE_ROUND_SHA" HEAD 2>/dev/null | head -20)
   if [ -z "$CHANGED_FILES" ]; then
-    CHANGED_FILES_DISPLAY="(No files changed yet - changes may be uncommitted)"
+    CHANGED_FILES_DISPLAY="(No committed changes in this round)"
   else
-    # Count files properly (grep -c will count lines, or use array)
+    # Count files properly
     FILE_COUNT=$(echo "$CHANGED_FILES" | grep -c '^')
+    # Format the file list (first 10 files only)
+    FILES_FORMATTED="$(echo "$CHANGED_FILES" | head -10 | tr '\n' ' ' | sed 's/ $//')"
+    
     if [ "$FILE_COUNT" -gt 10 ]; then
       # Show first 10 files and indicate there are more
       REMAINING=$((FILE_COUNT - 10))
       if [ "$REMAINING" -eq 1 ]; then
-        CHANGED_FILES_DISPLAY="$(echo "$CHANGED_FILES" | head -10 | tr '\n' ' ' | sed 's/ $//')... and 1 more file"
+        CHANGED_FILES_DISPLAY="${FILES_FORMATTED}... and 1 more file"
       else
-        CHANGED_FILES_DISPLAY="$(echo "$CHANGED_FILES" | head -10 | tr '\n' ' ' | sed 's/ $//')... and $REMAINING more files"
+        CHANGED_FILES_DISPLAY="${FILES_FORMATTED}... and $REMAINING more files"
       fi
     else
-      CHANGED_FILES_DISPLAY="$(echo "$CHANGED_FILES" | tr '\n' ' ' | sed 's/ $//')"
+      CHANGED_FILES_DISPLAY="$FILES_FORMATTED"
     fi
   fi
   
