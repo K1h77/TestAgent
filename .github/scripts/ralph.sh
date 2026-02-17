@@ -33,6 +33,34 @@ post_comment() {
 }
 
 # ==========================================
+# HELPER FUNCTION: Summarize Aider Output
+# ==========================================
+summarize_output() {
+  local raw_output="$1"
+  local output_type="$2"  # "plan", "coding", or "review"
+  
+  echo "$raw_output" | sed '/^─\{2,\}$/d' \
+    | sed '/^Aider v[0-9]/d' \
+    | sed '/^Model:/d' \
+    | sed '/^Git repo:/d' \
+    | sed '/^Repo-map:/d' \
+    | sed '/^Update git /d' \
+    | sed '/^Tokens:/d' \
+    | sed '/^Cost:/d' \
+    | sed '/^https:\/\/aider\.chat/d' \
+    | sed '/^The LLM did not conform/d' \
+    | sed '/^Applied edit to/d' \
+    | sed '/^Commit [0-9a-f]/d' \
+    | awk '
+      /^<<<<<<< SEARCH/ { skip=1; next }
+      /^>>>>>>> REPLACE/ { skip=0; next }
+      /^=======$/  { next }
+      !skip { print }
+    ' \
+    | sed '/^[[:space:]]*$/N;/^\n$/d'
+}
+
+# ==========================================
 # 1. SETUP: Configure Aider
 # ==========================================
 echo "🔧 [RALPH] Configuring Aider..."
@@ -112,7 +140,10 @@ echo "📝 [RALPH] Plan created:"
 echo "$PLAN_OUTPUT"
 
 # Post plan as issue comment
-post_comment "$PLAN_OUTPUT"
+PLAN_SUMMARY=$(summarize_output "$PLAN_OUTPUT" "plan")
+post_comment "## Plan
+
+$PLAN_SUMMARY"
 
 # ==========================================
 # 2.1. PLAN APPROVAL CHECK
@@ -165,6 +196,9 @@ Implement the ENTIRE plan in this single session."
     # Subsequent rounds: include reviewer feedback
     PROMPT_CODING="You are an autonomous agent working on GitHub Issue #$ISSUE_NUMBER in repository $REPO.
 
+Here are the issue details:
+$ISSUE_DETAILS
+
 If there are images attached to this issue, they have been provided to you. Use them to understand the visual requirements.
 
 Here is the original plan:
@@ -185,15 +219,26 @@ IMPORTANT: You have Playwright available for browser automation and visual testi
 Address ALL reviewer concerns in this session."
   fi
   
+  # Save current commit SHA before running aider
+  BEFORE_SHA=$(git rev-parse HEAD)
+  
   CODING_OUTPUT=$(aider --yes --model "$MODEL" $IMAGE_ARGS --message "$PROMPT_CODING")
   
   echo "✅ [RALPH] Coding complete for round $REVIEW_ROUND"
   echo "$CODING_OUTPUT"
   
   # Post coding summary as issue comment
+  CODING_SUMMARY=$(summarize_output "$CODING_OUTPUT" "coding")
+  # Also list which files were changed
+  CHANGED_FILES=$(git diff --name-only "$BEFORE_SHA" HEAD 2>/dev/null | head -20)
   post_comment "## Coding Round $REVIEW_ROUND
 
-$CODING_OUTPUT"
+$CODING_SUMMARY
+
+### Files Changed
+\`\`\`
+$CHANGED_FILES
+\`\`\`"
   
   # ==========================================
   # 3.1.1. VISUAL CHECK (if app exists)
@@ -223,26 +268,29 @@ https://github.com/$REPO/actions/runs/$GITHUB_RUN_ID"
   # ==========================================
   echo "🧐 [RALPH] Starting review for round $REVIEW_ROUND..."
   
-  # Stage all changes FIRST (including new untracked files)
-  git add -A
+  # Get current commit SHA after aider ran
+  AFTER_SHA=$(git rev-parse HEAD)
   
-  # Check if there are any changes
-  if git diff --cached --quiet; then
-    echo "⚠️  [RALPH] No changes detected after coding round."
-    post_comment "⚠️ **Warning**: Coding round $REVIEW_ROUND completed but no file changes were detected. Aider may have encountered an issue."
-    
-    if [ $REVIEW_ROUND -ge $MAX_REVIEW_ROUNDS ]; then
-      post_comment "❌ **Failed**: No code changes were made after $MAX_REVIEW_ROUNDS rounds."
-      exit 1
+  # Check if aider made any commits
+  if [ "$BEFORE_SHA" = "$AFTER_SHA" ]; then
+    # No commits were made by aider, check if there are uncommitted changes
+    git add -A
+    if git diff --cached --quiet; then
+      echo "⚠️  [RALPH] No changes detected after coding round."
+      post_comment "⚠️ **Warning**: Coding round $REVIEW_ROUND completed but no file changes were detected. Aider may have encountered an issue."
+      
+      if [ $REVIEW_ROUND -ge $MAX_REVIEW_ROUNDS ]; then
+        post_comment "❌ **Failed**: No code changes were made after $MAX_REVIEW_ROUNDS rounds."
+        exit 1
+      fi
+      
+      ((REVIEW_ROUND++))
+      continue
     fi
-    
-    ((REVIEW_ROUND++))
-    continue
   fi
   
-  # Get the diff of ALL staged changes (includes new files!)
-  # Fallback to diff without HEAD reference for repos without HEAD (initial commits)
-  DIFF_OUTPUT=$(git --no-pager diff --cached HEAD 2>/dev/null || git --no-pager diff --cached)
+  # Get the diff of changes made by aider (compare BEFORE_SHA to current HEAD)
+  DIFF_OUTPUT=$(git --no-pager diff "$BEFORE_SHA" HEAD 2>/dev/null || git --no-pager diff --cached)
   
   # Build review prompt
   PROMPT_REVIEW="You are a Senior Code Reviewer reviewing changes for GitHub Issue #$ISSUE_NUMBER in repository $REPO.
@@ -289,9 +337,10 @@ Be thorough but fair. Output ONLY 'LGTM' (with brief reasoning) or the concise l
   echo "$REVIEW_OUTPUT"
   
   # Post review output as issue comment
+  REVIEW_SUMMARY=$(summarize_output "$REVIEW_OUTPUT" "review")
   post_comment "## Review Round $REVIEW_ROUND
 
-$REVIEW_OUTPUT"
+$REVIEW_SUMMARY"
   
   # Check if review passed
   if [[ "$REVIEW_OUTPUT" == *"LGTM"* ]]; then
@@ -369,6 +418,9 @@ Review passed after $REVIEW_ROUND round(s)."
   if [ $REVIEW_ROUND -ge $MAX_REVIEW_ROUNDS ]; then
     echo "❌ [RALPH] Failed after $MAX_REVIEW_ROUNDS review rounds."
     
+    # Summarize feedback for posting
+    FEEDBACK_SUMMARY=$(summarize_output "$REVIEWER_FEEDBACK" "review")
+    
     # Check if there are any changes to push
     if git diff --quiet HEAD; then
       echo "⚠️  [RALPH] No changes to commit."
@@ -377,7 +429,7 @@ Review passed after $REVIEW_ROUND round(s)."
       FAILURE_MSG="❌ **Failed** after $MAX_REVIEW_ROUNDS review rounds.
 
 ## Last Review Issues
-$REVIEWER_FEEDBACK
+$FEEDBACK_SUMMARY
 
 ## What to do
 No code changes were made. The agent may have encountered issues or the problem may require a different approach.
@@ -406,7 +458,7 @@ You can:
     FAILURE_MSG="❌ **Failed** after $MAX_REVIEW_ROUNDS review rounds.
 
 ## Last Review Issues
-$REVIEWER_FEEDBACK
+$FEEDBACK_SUMMARY
 
 ## What to do
 The work-in-progress has been pushed to branch \`$BRANCH_NAME\`.
