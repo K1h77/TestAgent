@@ -22,7 +22,7 @@ fi
 
 if [ -f "$PRE_COMMIT_HOOK" ]; then
   echo "⚠️  Pre-commit hook already exists"
-  read -p "Overwrite? (y/n) " -n 1 -r
+  read -p "Overwrite? (y/n) " -n 1 -
   echo
   if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo "Aborted."

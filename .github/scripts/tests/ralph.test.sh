@@ -2,13 +2,6 @@
 
 setup_file() {
   export SHARED_TEST_DIR="$(mktemp -d)"
-  cd "$SHARED_TEST_DIR"
-  git init --quiet
-  git config user.email "test@example.com"
-  git config user.name "Test User"
-  touch test.txt
-  git add test.txt
-  git commit -m "Initial commit" --quiet
 }
 
 teardown_file() {
@@ -17,6 +10,7 @@ teardown_file() {
 }
 
 setup() {
+  # Reset per-test variables
   export ISSUE_NUMBER="456"
   export GITHUB_REPOSITORY="test/repo"
   export OPENROUTER_API_KEY="test-key"
@@ -45,9 +39,37 @@ setup() {
   export AIDER_TEST_FLAGS=""
   export ISSUE_IMAGE_FLAGS=""
   export ISSUE_IMAGES_DIR="$SHARED_TEST_DIR/images"
+  export SCREENSHOT_URLS=()
   
   cd "$SHARED_TEST_DIR"
   source "${BATS_TEST_DIRNAME}/../ralph.sh"
+  
+  # Mock git commands by default for speed
+  git() {
+    case "$1" in
+      rev-parse)
+        if [ "$2" = "--show-toplevel" ]; then
+          echo "$SHARED_TEST_DIR"
+        else
+          echo "mock-sha-$RANDOM"
+        fi
+        ;;
+      config)
+        if [ "$2" = "user.email" ]; then
+          echo "${RALPH_BOT_EMAIL:-test@example.com}"
+        elif [ "$2" = "user.name" ]; then
+          echo "${RALPH_BOT_NAME:-Test User}"
+        fi
+        ;;
+      diff|log)
+        echo "mock diff output"
+        ;;
+      *)
+        return 0
+        ;;
+    esac
+  }
+  export -f git
 }
 
 teardown() {
@@ -58,7 +80,7 @@ teardown() {
   unset BRANCH_NAME INITIAL_SHA BEFORE_ROUND_SHA REVIEW_ROUND
   unset CODING_SUMMARY REVIEW_SUMMARY REVIEW_OUTPUT REVIEWER_FEEDBACK
   unset SCREENSHOTS_EXIST ISSUE_LABELS TEST_COMMANDS AIDER_TEST_FLAGS
-  unset ISSUE_IMAGE_FLAGS ISSUE_IMAGES_DIR TESTS_FAILED_OUTPUT
+  unset ISSUE_IMAGE_FLAGS ISSUE_IMAGES_DIR TESTS_FAILED_OUTPUT SCREENSHOT_URLS
 }
 
 @test "validate_environment: fails when ISSUE_NUMBER is missing" {
@@ -263,6 +285,16 @@ End of summary"
 }
 
 @test "extract_changed_files: returns list of changed files" {
+  git() { command git "$@"; }
+  export -f git
+  
+  git init --quiet
+  git config user.email "test@example.com"
+  git config user.name "Test User"
+  echo "initial" > test.txt
+  git add test.txt
+  git commit -m "Initial" --quiet
+  
   echo "new content" > test.txt
   git add test.txt
   git commit -m "Update test" --quiet
@@ -273,6 +305,16 @@ End of summary"
 }
 
 @test "extract_changed_files: respects max files limit" {
+  git() { command git "$@"; }
+  export -f git
+  
+  git init --quiet
+  git config user.email "test@example.com"
+  git config user.name "Test User"
+  touch .gitkeep
+  git add .gitkeep
+  git commit -m "Initial" --quiet
+  
   for i in {1..25}; do
     echo "content $i" > "file$i.txt"
     git add "file$i.txt"
@@ -573,6 +615,58 @@ file3.txt"
   [ -n "$INITIAL_SHA" ]
 }
 
+@test "initialize_loop_state: sets empty SCREENSHOT_URLS" {
+  SCREENSHOT_URLS=("old" "data")
+  initialize_loop_state
+  [ ${#SCREENSHOT_URLS[@]} -eq 0 ]
+}
+
+@test "create_pr: includes screenshots when SCREENSHOT_URLS populated" {
+  SCREENSHOT_URLS=("test1.png|https://example.com/test1.png" "test2.png|https://example.com/test2.png")
+  
+  gh() {
+    if [ "$1" = "pr" ] && [ "$2" = "create" ]; then
+      for arg in "$@"; do
+        if [ "$arg" = "--body" ]; then
+          echo "$@" >> "$SHARED_TEST_DIR/pr-body.log"
+          break
+        fi
+      done
+    fi
+    return 0
+  }
+  export -f gh
+  
+  create_pr >/dev/null 2>&1
+  
+  [ -f "$SHARED_TEST_DIR/pr-body.log" ]
+  grep -q "Screenshots" "$SHARED_TEST_DIR/pr-body.log"
+  grep -q "test1.png" "$SHARED_TEST_DIR/pr-body.log"
+  grep -q "https://example.com/test1.png" "$SHARED_TEST_DIR/pr-body.log"
+}
+
+@test "create_pr: no screenshots section when SCREENSHOT_URLS empty" {
+  SCREENSHOT_URLS=()
+  
+  gh() {
+    if [ "$1" = "pr" ] && [ "$2" = "create" ]; then
+      for arg in "$@"; do
+        if [ "$arg" = "--body" ]; then
+          echo "$@" >> "$SHARED_TEST_DIR/pr-body.log"
+          break
+        fi
+      done
+    fi
+    return 0
+  }
+  export -f gh
+  
+  create_pr >/dev/null 2>&1
+  
+  [ -f "$SHARED_TEST_DIR/pr-body.log" ]
+  ! grep -q "Screenshots" "$SHARED_TEST_DIR/pr-body.log"
+}
+
 @test "handle_no_changes_failure: posts comment" {
   gh() {
     echo "gh $@" >> "$SHARED_TEST_DIR/gh-calls.log"
@@ -604,12 +698,20 @@ file3.txt"
 }
 
 @test "configure_git_user: sets email from config" {
+  git() { command git "$@"; }
+  export -f git
+  
+  git init --quiet
   configure_git_user >/dev/null 2>&1
   email=$(git config --global user.email)
   [ "$email" = "$RALPH_BOT_EMAIL" ]
 }
 
 @test "configure_git_user: sets name from config" {
+  git() { command git "$@"; }
+  export -f git
+  
+  git init --quiet
   configure_git_user >/dev/null 2>&1
   name=$(git config --global user.name)
   [ "$name" = "$RALPH_BOT_NAME" ]
@@ -625,6 +727,16 @@ file3.txt"
 }
 
 @test "get_diff_output: returns diff between commits" {
+  git() { command git "$@"; }
+  export -f git
+  
+  git init --quiet
+  git config user.email "test@example.com"
+  git config user.name "Test User"
+  echo "initial" > test.txt
+  git add test.txt
+  git commit -m "Initial" --quiet
+  
   local before=$(git rev-parse HEAD)
   echo "change1" > test.txt
   git add test.txt
