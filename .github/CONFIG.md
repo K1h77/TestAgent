@@ -16,7 +16,7 @@ The `configure-ralph` file contains all configuration values used across Ralph's
 - **`RALPH_MODEL_ARCHITECT_HARD`** (default: `openrouter/anthropic/claude-sonnet-4.5`)  
   Upgraded architect model used when the issue has a `hard` label. Automatically swaps in for more complex problems that need stronger reasoning.
 
-- **`RALPH_MODEL_CODER`** (default: `minimax/minimax-m2.5`)  
+- **`RALPH_MODEL_CODER`** (default: `openrouter/minimax/minimax-m2.5`)  
   AI model used as the editor (code writer) in aider's architect mode.
 
 - **`RALPH_MODEL_REVIEWER`** (default: `google/gemini-2.5-flash`)  
