@@ -20,7 +20,7 @@ let nextId = 2;
 
 // Routes
 app.get('/', (req, res) => {
-  res.json({ message: 'Task Manager API - Server is running!' });
+  res.json({ message: 'Task Manager API - Hey! Server is up and running!' });
 });
 
 // Get all tasks
