@@ -204,43 +204,43 @@ Other content"
 # ── apply_difficulty_overrides ──
 
 @test "apply_difficulty_overrides: upgrades architect when hard label present" {
-  MODEL_ARCHITECT="anthropic/claude-haiku-4.5"
-  RALPH_MODEL_ARCHITECT_HARD="anthropic/claude-sonnet-4.5"
+  MODEL_ARCHITECT="openrouter/anthropic/claude-haiku-4.5"
+  RALPH_MODEL_ARCHITECT_HARD="openrouter/anthropic/claude-sonnet-4.5"
   ISSUE_LABELS="frontend,hard"
   apply_difficulty_overrides >/dev/null 2>&1
-  [ "$MODEL_ARCHITECT" = "anthropic/claude-sonnet-4.5" ]
+  [ "$MODEL_ARCHITECT" = "openrouter/anthropic/claude-sonnet-4.5" ]
 }
 
 @test "apply_difficulty_overrides: no change without hard label" {
-  MODEL_ARCHITECT="anthropic/claude-haiku-4.5"
-  RALPH_MODEL_ARCHITECT_HARD="anthropic/claude-sonnet-4.5"
+  MODEL_ARCHITECT="openrouter/anthropic/claude-haiku-4.5"
+  RALPH_MODEL_ARCHITECT_HARD="openrouter/anthropic/claude-sonnet-4.5"
   ISSUE_LABELS="frontend,backend"
   apply_difficulty_overrides >/dev/null 2>&1
-  [ "$MODEL_ARCHITECT" = "anthropic/claude-haiku-4.5" ]
+  [ "$MODEL_ARCHITECT" = "openrouter/anthropic/claude-haiku-4.5" ]
 }
 
 @test "apply_difficulty_overrides: case-insensitive hard label" {
-  MODEL_ARCHITECT="anthropic/claude-haiku-4.5"
-  RALPH_MODEL_ARCHITECT_HARD="anthropic/claude-sonnet-4.5"
+  MODEL_ARCHITECT="openrouter/anthropic/claude-haiku-4.5"
+  RALPH_MODEL_ARCHITECT_HARD="openrouter/anthropic/claude-sonnet-4.5"
   ISSUE_LABELS="Hard"
   apply_difficulty_overrides >/dev/null 2>&1
-  [ "$MODEL_ARCHITECT" = "anthropic/claude-sonnet-4.5" ]
+  [ "$MODEL_ARCHITECT" = "openrouter/anthropic/claude-sonnet-4.5" ]
 }
 
 @test "apply_difficulty_overrides: no-op when RALPH_MODEL_ARCHITECT_HARD is empty" {
-  MODEL_ARCHITECT="anthropic/claude-haiku-4.5"
+  MODEL_ARCHITECT="openrouter/anthropic/claude-haiku-4.5"
   RALPH_MODEL_ARCHITECT_HARD=""
   ISSUE_LABELS="hard"
   apply_difficulty_overrides >/dev/null 2>&1
-  [ "$MODEL_ARCHITECT" = "anthropic/claude-haiku-4.5" ]
+  [ "$MODEL_ARCHITECT" = "openrouter/anthropic/claude-haiku-4.5" ]
 }
 
 @test "apply_difficulty_overrides: no-op when no labels" {
-  MODEL_ARCHITECT="anthropic/claude-haiku-4.5"
-  RALPH_MODEL_ARCHITECT_HARD="anthropic/claude-sonnet-4.5"
+  MODEL_ARCHITECT="openrouter/anthropic/claude-haiku-4.5"
+  RALPH_MODEL_ARCHITECT_HARD="openrouter/anthropic/claude-sonnet-4.5"
   ISSUE_LABELS=""
   apply_difficulty_overrides >/dev/null 2>&1
-  [ "$MODEL_ARCHITECT" = "anthropic/claude-haiku-4.5" ]
+  [ "$MODEL_ARCHITECT" = "openrouter/anthropic/claude-haiku-4.5" ]
 }
 
 @test "build_issue_image_flags: returns empty when no images dir" {

@@ -10,10 +10,10 @@ The `configure-ralph` file contains all configuration values used across Ralph's
 
 ### AI Models
 
-- **`RALPH_MODEL_ARCHITECT`** (default: `anthropic/claude-haiku-4.5`)  
+- **`RALPH_MODEL_ARCHITECT`** (default: `openrouter/anthropic/claude-haiku-4.5`)  
   Multi-modal AI model used as the architect/planner in aider's architect mode. This model can see images directly.
 
-- **`RALPH_MODEL_ARCHITECT_HARD`** (default: `anthropic/claude-sonnet-4.5`)  
+- **`RALPH_MODEL_ARCHITECT_HARD`** (default: `openrouter/anthropic/claude-sonnet-4.5`)  
   Upgraded architect model used when the issue has a `hard` label. Automatically swaps in for more complex problems that need stronger reasoning.
 
 - **`RALPH_MODEL_CODER`** (default: `minimax/minimax-m2.5`)  
