@@ -12,9 +12,32 @@ validate_environment() {
 }
 
 fetch_issue_metadata() {
-  ISSUE_TITLE=$(gh issue view "$ISSUE_NUMBER" --repo "$REPO" --json title --jq '.title // ""')
-  ISSUE_BODY=$(gh issue view "$ISSUE_NUMBER" --repo "$REPO" --json body --jq '.body // ""')
-  ISSUE_LABELS=$(gh issue view "$ISSUE_NUMBER" --repo "$REPO" --json labels --jq '[.labels[].name] | join(", ")')
+  ISSUE_TITLE=$(gh issue view "$ISSUE_NUMBER" --repo "$REPO" --json title --jq '.title // ""' 2>&1) || {
+    echo "❌ [PRE-PROCESS] Failed to fetch issue #$ISSUE_NUMBER from $REPO. gh output:"
+    echo "  $ISSUE_TITLE"
+    echo "❌ [PRE-PROCESS] Check that the issue exists and GITHUB_TOKEN has read access."
+    exit 1
+  }
+  
+  if [ -z "$ISSUE_TITLE" ]; then
+    echo "❌ [PRE-PROCESS] Issue #$ISSUE_NUMBER has no title. The issue may not exist or is inaccessible."
+    exit 1
+  fi
+  
+  ISSUE_BODY=$(gh issue view "$ISSUE_NUMBER" --repo "$REPO" --json body --jq '.body // ""' 2>&1) || {
+    echo "❌ [PRE-PROCESS] Failed to fetch issue body for #$ISSUE_NUMBER."
+    exit 1
+  }
+  
+  if [ -z "$ISSUE_BODY" ]; then
+    echo "⚠️  [PRE-PROCESS] Issue #$ISSUE_NUMBER has an empty body. The issue may lack sufficient detail for the agent."
+  fi
+  
+  ISSUE_LABELS=$(gh issue view "$ISSUE_NUMBER" --repo "$REPO" --json labels --jq '[.labels[].name] | join(", ")' 2>/dev/null) || {
+    echo "⚠️  [PRE-PROCESS] Could not fetch labels for issue #$ISSUE_NUMBER (non-fatal)."
+    ISSUE_LABELS=""
+  }
+  
   echo "  Title: $ISSUE_TITLE"
 }
 
@@ -51,6 +74,15 @@ Body:
 $ISSUE_BODY
 
 Labels: $ISSUE_LABELS"
+  
+  # Final sanity check: ISSUE_DETAILS must contain meaningful content
+  local stripped
+  stripped=$(echo "$ISSUE_DETAILS" | sed 's/Title://;s/Body://;s/Labels://;s/[[:space:]]//g')
+  if [ -z "$stripped" ]; then
+    echo "❌ [PRE-PROCESS] ISSUE_DETAILS is effectively empty after assembly. Cannot proceed."
+    echo "   Title='$ISSUE_TITLE' Body='$(echo "$ISSUE_BODY" | head -c 100)' Labels='$ISSUE_LABELS'"
+    exit 1
+  fi
   
   echo ""
   echo "📋 [PRE-PROCESS] Final issue details:"
@@ -91,6 +123,6 @@ main() {
   build_issue_details
 }
 
-if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
-  main
-fi
+# Always run main — this script is sourced by ralph.sh
+# and needs to execute to populate ISSUE_DETAILS
+main

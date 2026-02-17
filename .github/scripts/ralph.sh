@@ -13,6 +13,32 @@ validate_environment() {
     echo "❌ Error: GITHUB_REPOSITORY env var missing."
     exit 1
   fi
+  if [ -z "$OPENROUTER_API_KEY" ]; then
+    echo "❌ Error: OPENROUTER_API_KEY env var missing. Required for aider and review API calls."
+    exit 1
+  fi
+  
+  # Validate gh CLI is available and authenticated
+  if ! command -v gh &>/dev/null; then
+    echo "❌ Error: GitHub CLI (gh) is not installed or not in PATH."
+    exit 1
+  fi
+  if ! gh auth status &>/dev/null; then
+    echo "❌ Error: GitHub CLI is not authenticated. Run 'gh auth login' first."
+    exit 1
+  fi
+  
+  # Validate aider is available
+  if ! command -v aider &>/dev/null; then
+    echo "❌ Error: aider is not installed or not in PATH."
+    exit 1
+  fi
+  
+  # Validate jq is available (used for review API)
+  if ! command -v jq &>/dev/null; then
+    echo "❌ Error: jq is not installed or not in PATH. Required for review API calls."
+    exit 1
+  fi
 }
 
 initialize_configuration() {
@@ -22,11 +48,36 @@ initialize_configuration() {
   MODEL_REVIEWER="$RALPH_MODEL_REVIEWER"
   PR_SUMMARY_MAX_LINES="$RALPH_PR_SUMMARY_MAX_LINES"
   MAX_REVIEW_ROUNDS="$RALPH_MAX_REVIEW_ROUNDS"
+  
+  # Validate required configuration
+  local missing=()
+  [ -z "$MODEL_ARCHITECT" ] && missing+=("RALPH_MODEL_ARCHITECT")
+  [ -z "$MODEL_CODER" ] && missing+=("RALPH_MODEL_CODER")
+  [ -z "$MODEL_REVIEWER" ] && missing+=("RALPH_MODEL_REVIEWER")
+  [ -z "$MAX_REVIEW_ROUNDS" ] && missing+=("RALPH_MAX_REVIEW_ROUNDS")
+  
+  if [ ${#missing[@]} -gt 0 ]; then
+    echo "❌ [RALPH] Missing required configuration: ${missing[*]}"
+    echo "   Check .github/configure-ralph for missing values."
+    exit 1
+  fi
+  
+  if ! [[ "$MAX_REVIEW_ROUNDS" =~ ^[0-9]+$ ]] || [ "$MAX_REVIEW_ROUNDS" -lt 1 ]; then
+    echo "❌ [RALPH] RALPH_MAX_REVIEW_ROUNDS must be a positive integer, got: '$MAX_REVIEW_ROUNDS'"
+    exit 1
+  fi
+  
   echo "🤖 [RALPH] Waking up. Target: Issue #$ISSUE_NUMBER in $REPO"
 }
 
 navigate_to_repo_root() {
-  cd "$(git rev-parse --show-toplevel)"
+  local toplevel
+  toplevel=$(git rev-parse --show-toplevel 2>&1) || {
+    echo "❌ [RALPH] Not inside a git repository. Cannot determine repo root."
+    echo "   git output: $toplevel"
+    exit 1
+  }
+  cd "$toplevel"
   REPO_ROOT="$(pwd)"
 }
 
@@ -48,6 +99,19 @@ extract_summary() {
 preprocess_issue_details() {
   echo "🔧 [RALPH] Configuring Aider..."
   source "$SCRIPT_DIR/pre-process-issue.sh"
+  
+  # Validate that ISSUE_DETAILS was actually populated
+  if [ -z "$ISSUE_DETAILS" ]; then
+    echo "❌ [RALPH] ISSUE_DETAILS is empty after preprocessing. The issue content could not be fetched."
+    echo "   This means aider will receive no context and will hallucinate a task."
+    post_comment "❌ **Fatal**: Could not fetch issue details for #$ISSUE_NUMBER. Ralph cannot proceed without knowing what to do." 2>/dev/null || true
+    exit 1
+  fi
+  
+  if [ -z "$ISSUE_TITLE" ]; then
+    echo "❌ [RALPH] ISSUE_TITLE is empty. Cannot proceed without an issue title."
+    exit 1
+  fi
 }
 
 resolve_test_commands() {
@@ -127,13 +191,28 @@ build_issue_image_flags() {
 
 configure_git_user() {
   echo "🔧 [RALPH] Setting up git branch..."
+  
+  if [ -z "$RALPH_BOT_EMAIL" ] || [ -z "$RALPH_BOT_NAME" ]; then
+    echo "❌ [RALPH] RALPH_BOT_EMAIL and RALPH_BOT_NAME must be set for git commits."
+    exit 1
+  fi
+  
   git config --global user.email "$RALPH_BOT_EMAIL"
   git config --global user.name "$RALPH_BOT_NAME"
 }
 
 create_feature_branch() {
   BRANCH_NAME="$RALPH_BRANCH_PREFIX-$ISSUE_NUMBER-auto-$(date +%s)"
-  git checkout -b "$BRANCH_NAME"
+  
+  if [ -z "$RALPH_BRANCH_PREFIX" ]; then
+    echo "❌ [RALPH] RALPH_BRANCH_PREFIX is empty. Cannot create branch."
+    exit 1
+  fi
+  
+  if ! git checkout -b "$BRANCH_NAME" 2>&1; then
+    echo "❌ [RALPH] Failed to create branch: $BRANCH_NAME"
+    exit 1
+  fi
   echo "✅ [RALPH] Created branch: $BRANCH_NAME"
 }
 
@@ -246,7 +325,12 @@ End your response with a section that starts with the line '## Summary' (on its 
 
 run_aider_coding() {
   local prompt="$1"
-  eval "aider --yes-always --architect --model \"$MODEL_ARCHITECT\" --editor-model \"$MODEL_CODER\" $ISSUE_IMAGE_FLAGS $AIDER_TEST_FLAGS --message \"$prompt\""
+  local aider_exit_code=0
+  eval "aider --yes-always --architect --model \"$MODEL_ARCHITECT\" --editor-model \"$MODEL_CODER\" $ISSUE_IMAGE_FLAGS $AIDER_TEST_FLAGS --message \"$prompt\"" || aider_exit_code=$?
+  
+  if [ $aider_exit_code -ne 0 ]; then
+    echo "⚠️  [RALPH] Aider exited with code $aider_exit_code. It may have encountered an error."
+  fi
 }
 
 get_coding_summary() {
@@ -376,11 +460,19 @@ execute_main_loop() {
       PROMPT_CODING=$(build_revision_coding_prompt)
     fi
     
+    # Sanity check: prompt must contain issue details
+    if [ -z "$PROMPT_CODING" ]; then
+      echo "❌ [RALPH] Coding prompt is empty. Cannot proceed."
+      post_comment "❌ **Fatal**: Failed to build coding prompt for round $REVIEW_ROUND."
+      exit 1
+    fi
+    
     BEFORE_ROUND_SHA=$(git rev-parse HEAD)
     CODING_OUTPUT=$(run_aider_coding "$PROMPT_CODING")
     
-    echo "✅ [RALPH] Coding complete for round $REVIEW_ROUND"
-    echo "$CODING_OUTPUT"
+    if [ -z "$CODING_OUTPUT" ]; then
+      echo "⚠️  [RALPH] Aider produced no output for round $REVIEW_ROUND."
+    fi
     
     CODING_SUMMARY=$(get_coding_summary "$CODING_OUTPUT")
     CHANGED_FILES=$(extract_changed_files "$BEFORE_ROUND_SHA")
@@ -429,7 +521,14 @@ check_for_changes() {
 }
 
 get_diff_output() {
-  git --no-pager diff "$BEFORE_ROUND_SHA" HEAD 2>/dev/null || git --no-pager diff --cached
+  local diff
+  diff=$(git --no-pager diff "$BEFORE_ROUND_SHA" HEAD 2>/dev/null || git --no-pager diff --cached 2>/dev/null)
+  
+  if [ -z "$diff" ]; then
+    echo "❌ [RALPH] Diff output is empty despite changes being detected." >&2
+  fi
+  
+  echo "$diff"
 }
 
 build_base_review_prompt() {
@@ -482,7 +581,19 @@ Be thorough but fair. Make sure to include the '## Review Summary' section at th
 
 build_review_content_json() {
   local prompt_review="$1"
-  jq -n --arg text "$prompt_review" '[{"type": "text", "text": $text}]'
+  
+  if [ -z "$prompt_review" ]; then
+    echo "❌ [RALPH] Cannot build review JSON: review prompt is empty." >&2
+    return 1
+  fi
+  
+  local json_output
+  json_output=$(jq -n --arg text "$prompt_review" '[{"type": "text", "text": $text}]' 2>&1) || {
+    echo "❌ [RALPH] jq failed to build review content JSON: $json_output" >&2
+    return 1
+  }
+  
+  echo "$json_output"
 }
 
 attach_screenshots_to_review() {
@@ -521,35 +632,87 @@ attach_issue_images_to_review() {
 
 call_review_api() {
   local review_content="$1"
+  
+  # Validate API key
+  if [ -z "$OPENROUTER_API_KEY" ]; then
+    echo "❌ [RALPH] OPENROUTER_API_KEY is not set. Cannot call review API." >&2
+    echo '{"error": "OPENROUTER_API_KEY not set"}'
+    return 1
+  fi
+  
   local api_payload_file=$(mktemp)
-  jq -n \
+  if ! jq -n \
     --arg model "$MODEL_REVIEWER" \
     --argjson content "$review_content" \
     '{
       model: $model,
       messages: [{"role": "user", "content": $content}]
-    }' > "$api_payload_file"
+    }' > "$api_payload_file" 2>&1; then
+    echo "❌ [RALPH] Failed to build review API payload (jq error)." >&2
+    rm -f "$api_payload_file"
+    echo '{"error": "Failed to build API payload"}'
+    return 1
+  fi
   
-  local review_response=$(curl -s "${RALPH_OPENROUTER_API_URL:-https://openrouter.ai/api/v1/chat/completions}" \
+  local http_code
+  local response_file=$(mktemp)
+  http_code=$(curl -s -w '%{http_code}' -o "$response_file" \
+    "${RALPH_OPENROUTER_API_URL:-https://openrouter.ai/api/v1/chat/completions}" \
     -H "Authorization: Bearer $OPENROUTER_API_KEY" \
     -H "Content-Type: application/json" \
     -d @"$api_payload_file")
   
-  rm -f "$api_payload_file"
+  local review_response
+  review_response=$(cat "$response_file")
+  rm -f "$api_payload_file" "$response_file"
+  
+  if [ -z "$http_code" ] || [ "$http_code" -ge 400 ] 2>/dev/null; then
+    echo "❌ [RALPH] Review API returned HTTP $http_code." >&2
+    echo "$review_response" | jq . 2>/dev/null >&2 || echo "$review_response" >&2
+  fi
+  
+  # Validate response is valid JSON
+  if ! echo "$review_response" | jq . >/dev/null 2>&1; then
+    echo "❌ [RALPH] Review API returned invalid JSON." >&2
+    echo "   Raw response (first 500 chars): $(echo "$review_response" | head -c 500)" >&2
+    echo '{"error": "Invalid JSON response from API"}'
+    return 1
+  fi
+  
+  # Check for API-level errors in the response body
+  local api_error
+  api_error=$(echo "$review_response" | jq -r '.error.message // empty' 2>/dev/null)
+  if [ -n "$api_error" ]; then
+    echo "❌ [RALPH] Review API error: $api_error" >&2
+  fi
+  
   echo "$review_response"
 }
 
 extract_review_content() {
   local review_response="$1"
-  local review_output=$(echo "$review_response" | jq -r '.choices[0].message.content // empty')
+  local review_output
+  review_output=$(echo "$review_response" | jq -r '.choices[0].message.content // empty' 2>/dev/null)
   
   if [ -z "$review_output" ]; then
-    echo "❌ [RALPH] Reviewer API returned no content. Raw response:" >&2
-    echo "$review_response" | jq . 2>/dev/null || echo "$review_response" >&2
-    echo "Error: Reviewer returned no response. Treating as review failure."
-  else
-    echo "$review_output"
+    echo "❌ [RALPH] Reviewer API returned no content." >&2
+    
+    # Check for specific error patterns
+    local api_error
+    api_error=$(echo "$review_response" | jq -r '.error.message // empty' 2>/dev/null)
+    if [ -n "$api_error" ]; then
+      echo "❌ [RALPH] API error: $api_error" >&2
+    else
+      echo "❌ [RALPH] Raw response:" >&2
+      echo "$review_response" | jq . 2>/dev/null >&2 || echo "$review_response" >&2
+    fi
+    
+    # Return a structured failure message that won't accidentally match LGTM
+    echo "REVIEW_API_FAILURE: Reviewer returned no content. This is not an approval."
+    return 1
   fi
+  
+  echo "$review_output"
 }
 
 post_review_summary() {
@@ -571,17 +734,43 @@ perform_review() {
   fi
   
   DIFF_OUTPUT=$(get_diff_output)
+  if [ -z "$DIFF_OUTPUT" ]; then
+    echo "❌ [RALPH] Cannot perform review: diff output is empty."
+    REVIEW_OUTPUT="REVIEW_FAILED: No diff content available to review."
+    post_comment "⚠️ **Review Skipped (Round $REVIEW_ROUND)**: Could not generate a diff of the changes."
+    return
+  fi
+  
   PROMPT_REVIEW=$(build_base_review_prompt "$DIFF_OUTPUT")
   PROMPT_REVIEW=$(append_visual_verification "$PROMPT_REVIEW")
   PROMPT_REVIEW=$(append_review_instructions "$PROMPT_REVIEW")
   
   echo "🧐 [RALPH] Calling $MODEL_REVIEWER via OpenRouter API..."
   REVIEW_CONTENT=$(build_review_content_json "$PROMPT_REVIEW")
+  if [ -z "$REVIEW_CONTENT" ] || [ "$REVIEW_CONTENT" = "null" ]; then
+    echo "❌ [RALPH] Failed to build review content JSON."
+    REVIEW_OUTPUT="REVIEW_FAILED: Could not construct review payload."
+    post_comment "❌ **Review Failed (Round $REVIEW_ROUND)**: Internal error building review payload."
+    return
+  fi
+  
   REVIEW_CONTENT=$(attach_screenshots_to_review "$REVIEW_CONTENT")
   REVIEW_CONTENT=$(attach_issue_images_to_review "$REVIEW_CONTENT")
   
   REVIEW_RESPONSE=$(call_review_api "$REVIEW_CONTENT")
+  if [ $? -ne 0 ]; then
+    echo "❌ [RALPH] Review API call failed."
+    REVIEW_OUTPUT="REVIEW_FAILED: API call returned an error. This is not an approval."
+    post_comment "❌ **Review Failed (Round $REVIEW_ROUND)**: Could not reach the review API. Check OPENROUTER_API_KEY and network connectivity."
+    return
+  fi
+  
   REVIEW_OUTPUT=$(extract_review_content "$REVIEW_RESPONSE")
+  if [ $? -ne 0 ]; then
+    echo "❌ [RALPH] Reviewer returned no usable content."
+    post_comment "❌ **Review Failed (Round $REVIEW_ROUND)**: Reviewer API returned empty or invalid response."
+    return
+  fi
   
   echo "📋 [RALPH] Review result:"
   echo "$REVIEW_OUTPUT"
@@ -591,7 +780,8 @@ perform_review() {
 }
 
 review_passed() {
-  [[ "$REVIEW_OUTPUT" == *"LGTM"* ]]
+  # Check for standalone LGTM (not embedded in phrases like "Cannot provide LGTM")
+  echo "$REVIEW_OUTPUT" | grep -qP '^\s*LGTM\s*$'
 }
 
 verify_all_tests_pass() {
@@ -696,8 +886,18 @@ Returning to coding phase to fix these test failures."
   echo "🚀 [RALPH] Creating PR..."
   
   commit_if_needed
-  git push origin "$BRANCH_NAME"
-  create_pr
+  
+  if ! git push origin "$BRANCH_NAME" 2>&1; then
+    echo "❌ [RALPH] Failed to push branch $BRANCH_NAME to origin."
+    post_comment "❌ **Error**: Failed to push branch \`$BRANCH_NAME\` to origin. Check repository permissions."
+    exit 1
+  fi
+  
+  if ! create_pr; then
+    echo "❌ [RALPH] Failed to create pull request."
+    post_comment "❌ **Error**: Branch was pushed but PR creation failed. You can manually create a PR from branch \`$BRANCH_NAME\`."
+    exit 1
+  fi
   
   post_comment "✅ **Success!** Ralph has completed the work and created a PR.
 
@@ -749,6 +949,11 @@ You can:
 
 handle_review_failure() {
   REVIEWER_FEEDBACK="$REVIEW_OUTPUT"
+  
+  # Guard: if review output is empty or an internal failure marker, set useful feedback
+  if [ -z "$REVIEWER_FEEDBACK" ] || [[ "$REVIEWER_FEEDBACK" == REVIEW_FAILED:* ]] || [[ "$REVIEWER_FEEDBACK" == REVIEW_API_FAILURE:* ]]; then
+    REVIEWER_FEEDBACK="The review could not be completed (API failure or empty response). Please re-examine the issue requirements carefully and ensure your implementation is complete and correct. Re-read the issue details and verify every requirement is addressed."
+  fi
   
   if [ $REVIEW_ROUND -ge $MAX_REVIEW_ROUNDS ]; then
     echo "❌ [RALPH] Failed after $MAX_REVIEW_ROUNDS review rounds."
