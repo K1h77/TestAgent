@@ -217,7 +217,7 @@ $CODING_SUMMARY
   # ==========================================
   # Remove any screenshots that may have been staged/committed
   echo "🧹 [RALPH] Cleaning up screenshots from git..."
-  git rm -r --cached screenshots/ 2>/dev/null || true
+  git rm --cached screenshots/ 2>/dev/null || true
   git checkout -- .gitignore 2>/dev/null || true
   
   # ==========================================
@@ -250,9 +250,9 @@ Screenshots captured after coding changes:
         IMAGE_URL=""
         
         # Create a lightweight tag and release for storing screenshots
-        if gh release create "$TEMP_TAG" --repo "$REPO" --title "Screenshots for Issue #$ISSUE_NUMBER" --notes "Temporary release for screenshot storage" --target "$BRANCH_NAME" 2>/dev/null; then
+        if gh release create "$TEMP_TAG" --repo "$REPO" --title "Screenshots for Issue #$ISSUE_NUMBER" --notes "Temporary release for screenshot storage" --target "$BRANCH_NAME" 2>&1 | tee -a /tmp/ralph-upload.log; then
           # Upload screenshot as release asset
-          if gh release upload "$TEMP_TAG" "$screenshot_file" --repo "$REPO" --clobber 2>/dev/null; then
+          if gh release upload "$TEMP_TAG" "$screenshot_file" --repo "$REPO" --clobber 2>&1 | tee -a /tmp/ralph-upload.log; then
             # Get the asset URL
             IMAGE_URL=$(gh api "repos/$REPO/releases/tags/$TEMP_TAG" --jq ".assets[] | select(.name == \"$filename\") | .browser_download_url" 2>/dev/null)
           fi
@@ -284,18 +284,17 @@ View all screenshots in [workflow artifacts](https://github.com/$REPO/actions/ru
     
     # Clean up old screenshot releases (older than 7 days)
     echo "🧹 [RALPH] Cleaning up old screenshot releases..."
-    SEVEN_DAYS_AGO=$(date -d '7 days ago' +%s 2>/dev/null || date -v-7d +%s 2>/dev/null || echo "0")
-    gh api "repos/$REPO/releases" --paginate --jq '.[] | select(.tag_name | startswith("screenshots-issue-")) | {tag: .tag_name, id: .id, created: .created_at}' | \
-    while read -r release_data; do
-      TAG=$(echo "$release_data" | jq -r '.tag')
-      ID=$(echo "$release_data" | jq -r '.id')
-      CREATED=$(echo "$release_data" | jq -r '.created')
-      CREATED_TS=$(date -d "$CREATED" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$CREATED" +%s 2>/dev/null || echo "0")
-      if [ "$CREATED_TS" -lt "$SEVEN_DAYS_AGO" ] && [ "$CREATED_TS" != "0" ]; then
-        echo "  Deleting old release: $TAG (created $CREATED)"
-        gh release delete "$TAG" --repo "$REPO" --yes 2>/dev/null || true
+    SEVEN_DAYS_AGO=$(date -d '7 days ago' +%s 2>/dev/null || date -v-7d +%s 2>/dev/null || date +%s)
+    gh api "repos/$REPO/releases" --paginate --jq '.[] | select(.tag_name | startswith("screenshots-issue-")) | "\(.tag_name)|\(.id)|\(.created_at)"' 2>/dev/null | \
+    while IFS='|' read -r TAG ID CREATED; do
+      if [ -n "$TAG" ]; then
+        CREATED_TS=$(date -d "$CREATED" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$CREATED" +%s 2>/dev/null || date +%s)
+        if [ "$CREATED_TS" -lt "$SEVEN_DAYS_AGO" ]; then
+          echo "  Deleting old release: $TAG (created $CREATED)"
+          gh release delete "$TAG" --repo "$REPO" --yes 2>/dev/null || true
+        fi
       fi
-    done 2>/dev/null || true
+    done || true
   else
     echo "ℹ️  [RALPH] No screenshots found in screenshots/ directory"
   fi
