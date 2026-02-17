@@ -243,32 +243,31 @@ Screenshots captured after coding changes:
         filename=$(basename "$screenshot_file")
         echo "  Uploading $filename..."
         
-        # Upload image to GitHub and get URL
-        # Using the GitHub user content upload endpoint
-        UPLOAD_RESPONSE=$(curl -s -X POST \
-          -H "Authorization: token $PAT_TOKEN" \
-          -H "Accept: application/vnd.github+json" \
-          -F "file=@$screenshot_file" \
-          "https://uploads.github.com/repos/$REPO/issues/$ISSUE_NUMBER/assets" 2>/dev/null || echo "{}")
+        # Try to upload to GitHub using issue comment attachments
+        # The most reliable method is to use GitHub's upload-asset endpoint
+        # First, we'll try to create a temporary release tag for storing images
+        TEMP_TAG="screenshots-issue-${ISSUE_NUMBER}-$(date +%s)"
+        IMAGE_URL=""
         
-        # Try to extract URL from response (this endpoint may vary)
-        IMAGE_URL=$(echo "$UPLOAD_RESPONSE" | jq -r '.url // .asset.url // empty' 2>/dev/null)
-        
-        # If that didn't work, try alternative approach: create a gist
-        if [ -z "$IMAGE_URL" ]; then
-          echo "  Trying gist upload..."
-          GIST_RESPONSE=$(gh api -X POST /gists -f public=false -f description="Screenshot for issue #$ISSUE_NUMBER" \
-            -f "files[$filename][content]=<$(base64 -w 0 "$screenshot_file" 2>/dev/null || base64 "$screenshot_file")" 2>/dev/null || echo "{}")
-          IMAGE_URL=$(echo "$GIST_RESPONSE" | jq -r ".files[\"$filename\"].raw_url // empty" 2>/dev/null)
+        # Create a lightweight tag and release for storing screenshots
+        if gh release create "$TEMP_TAG" --repo "$REPO" --title "Screenshots for Issue #$ISSUE_NUMBER" --notes "Temporary release for screenshot storage" --target "$BRANCH_NAME" 2>/dev/null; then
+          # Upload screenshot as release asset
+          if gh release upload "$TEMP_TAG" "$screenshot_file" --repo "$REPO" --clobber 2>/dev/null; then
+            # Get the asset URL
+            IMAGE_URL=$(gh api "repos/$REPO/releases/tags/$TEMP_TAG" --jq ".assets[] | select(.name == \"$filename\") | .browser_download_url" 2>/dev/null)
+          fi
         fi
         
-        # If still no URL, just reference the artifact
-        if [ -z "$IMAGE_URL" ]; then
-          SCREENSHOT_COMMENT="$SCREENSHOT_COMMENT
-- 📸 \`$filename\` (see workflow artifacts)"
-        else
+        # If upload succeeded, embed the image
+        if [ -n "$IMAGE_URL" ]; then
           SCREENSHOT_COMMENT="$SCREENSHOT_COMMENT
 ![${filename}](${IMAGE_URL})"
+          echo "  ✓ Uploaded: $IMAGE_URL"
+        else
+          # Fallback to artifact reference
+          SCREENSHOT_COMMENT="$SCREENSHOT_COMMENT
+- 📸 \`$filename\`"
+          echo "  ⚠ Could not upload, will reference artifact instead"
         fi
         
         # Collect screenshot files for the multimodal reviewer
