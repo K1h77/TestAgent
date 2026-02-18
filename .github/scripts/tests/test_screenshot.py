@@ -61,8 +61,8 @@ class TestTakeScreenshot:
         result = take_screenshot(mock_cline, output_path, "before")
         assert result is None
 
-    def test_logs_other_pngs_when_expected_file_missing(self, tmp_path):
-        """When expected file is missing, should log any other PNGs saved by Cline."""
+    def test_adopts_misnamed_png_when_expected_file_missing(self, tmp_path):
+        """When expected file is missing but another PNG exists, should rename and return it."""
         output_path = tmp_path / "before.png"
 
         def save_differently(*args, **kwargs):
@@ -73,11 +73,12 @@ class TestTakeScreenshot:
         mock_cline = MagicMock()
         mock_cline.run.side_effect = save_differently
 
-        import logging
         with patch("lib.screenshot.logger") as mock_logger:
             result = take_screenshot(mock_cline, output_path, "before")
-            assert result is None
-            # Warning should mention the actually-saved filename
+            # Should rename switch.png → before.png and return the path
+            assert result == output_path
+            assert output_path.exists()
+            # Should log a warning mentioning the rename
             warning_calls = " ".join(
                 str(c) for c in mock_logger.warning.call_args_list
             )
