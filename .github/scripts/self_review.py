@@ -39,7 +39,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 MCP_SETTINGS_PATH = SCRIPTS_DIR / "cline-config" / "cline_mcp_settings.json"
 PROMPTS_DIR = SCRIPTS_DIR / "prompts"
 MAX_REVIEW_ITERATIONS = 3
-REVIEW_TIMEOUT = 300  # 5 minutes for review
+REVIEW_TIMEOUT = 600  # 10 minutes for review
 FIX_TIMEOUT = 600  # 10 minutes for fixes
 
 
@@ -142,7 +142,7 @@ def main() -> None:
         body=require_env("ISSUE_BODY"),
     )
     pr_number = require_env("PR_NUMBER")
-    branch = os.environ.get("BRANCH", f"ralph/issue-{issue.number}")
+    branch = require_env("BRANCH")
 
     require_env("OPENROUTER_API_KEY")
 
@@ -159,7 +159,7 @@ def main() -> None:
         # Fresh reviewer context each time
         reviewer = ClineRunner(
             cline_dir=REPO_ROOT / f".cline-reviewer-{iteration}",
-            model="google/gemini-3-flash-preview",
+            model="google/gemini-2.5-flash-preview",
             command_permissions=READ_ONLY_PERMISSIONS,
         )
 
@@ -178,8 +178,9 @@ def main() -> None:
         # Truncate diff if too large to avoid token limits
         max_diff_len = 30000
         if len(diff) > max_diff_len:
+            original_len = len(diff)
             diff = diff[:max_diff_len] + "\n\n... (diff truncated, see full diff in PR)"
-            logger.info(f"Diff truncated from {len(diff)} to {max_diff_len} chars")
+            logger.info(f"Diff truncated from {original_len} to {max_diff_len} chars")
 
         review_prompt = load_template(
             "review_prompt.md",
@@ -242,7 +243,11 @@ def main() -> None:
                     branch,
                 )
             except GitError as e:
-                logger.warning(f"Commit after review fix failed: {e}")
+                logger.error(
+                    f"Commit/push after review fix failed (round {iteration}): {e}. "
+                    f"Next review iteration will see stale diff."
+                )
+                continue
 
     # ── 3. Exhausted iterations ─────────────────────────────────
     logger.warning("Max review iterations reached. Posting final review.")

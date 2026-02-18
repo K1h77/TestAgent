@@ -72,10 +72,20 @@ def take_screenshot(
 
     # Validate the screenshot was actually created
     if not output_path.exists():
-        logger.warning(
-            f"Screenshot '{label}' was not created at {output_path}. "
-            f"Cline may not have saved the file. Continuing without screenshot."
-        )
+        # Fallback: log any PNGs that were actually saved in the directory
+        saved = list(output_path.parent.glob("*.png"))
+        if saved:
+            names = ", ".join(p.name for p in saved)
+            logger.warning(
+                f"Screenshot '{label}' was not saved at expected path {output_path}. "
+                f"Cline saved these files instead (check prompt): {names}. "
+                f"Continuing without screenshot."
+            )
+        else:
+            logger.warning(
+                f"Screenshot '{label}' was not created at {output_path}. "
+                f"Cline may not have saved the file. Continuing without screenshot."
+            )
         return None
 
     file_size = output_path.stat().st_size

@@ -77,7 +77,7 @@ class TestClineRunnerInit:
             mcp_settings_path=mcp_src,
         )
 
-        dest = cline_dir / "cline_mcp_settings.json"
+        dest = cline_dir / "data" / "settings" / "cline_mcp_settings.json"
         assert dest.exists()
         assert json.loads(dest.read_text()) == {"mcpServers": {}}
 

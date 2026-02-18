@@ -94,6 +94,9 @@ def configure_git_user(name: str = "Ralph Bot", email: str = "ralph-bot@users.no
 def create_branch(name: str) -> None:
     """Create and checkout a new branch from current HEAD.
 
+    If the branch already exists on the remote (e.g. from a prior cancelled
+    run), checks it out and resets it to the remote state instead of failing.
+
     Args:
         name: Branch name.
 
@@ -104,8 +107,25 @@ def create_branch(name: str) -> None:
     if not name or not name.strip():
         raise ValueError("Branch name cannot be empty.")
 
-    _run_git(["checkout", "-b", name.strip()])
-    logger.info(f"Created and checked out branch: {name}")
+    name = name.strip()
+
+    # Fetch so we have up-to-date remote refs
+    _run_git(["fetch", "origin"], check=False)
+
+    # Check if the branch already exists on the remote
+    ls = _run_git(["ls-remote", "--heads", "origin", name], check=False)
+    if ls.stdout.strip():
+        # Remote branch exists — reuse it, reset to remote state
+        logger.warning(
+            f"Branch '{name}' already exists on remote (prior run?). "
+            f"Checking out and resetting to origin/{name}."
+        )
+        _run_git(["checkout", name])
+        _run_git(["reset", "--hard", f"origin/{name}"])
+    else:
+        _run_git(["checkout", "-b", name])
+
+    logger.info(f"On branch: {name}")
 
 
 def commit_and_push(message: str, branch: str) -> None:
@@ -138,8 +158,23 @@ def commit_and_push(message: str, branch: str) -> None:
     _run_git(["commit", "-m", message])
     logger.info(f"Committed: {message[:80]}")
 
-    # Push
-    _run_git(["push", "origin", branch.strip()])
+    # Push — retry once with pull-rebase on non-fast-forward rejection
+    push_result = _run_git(["push", "origin", branch.strip()], check=False)
+    if push_result.returncode != 0:
+        stderr = push_result.stderr
+        if "non-fast-forward" in stderr or "rejected" in stderr:
+            logger.warning(
+                "Push rejected (non-fast-forward). Attempting pull-rebase and retry..."
+            )
+            _run_git(["pull", "--rebase", "origin", branch.strip()])
+            _run_git(["push", "origin", branch.strip()])
+        else:
+            raise GitError(
+                f"git push origin {branch.strip()} failed (exit {push_result.returncode}): "
+                f"{stderr.strip()}",
+                stderr=stderr,
+                exit_code=push_result.returncode,
+            )
     logger.info(f"Pushed to origin/{branch}")
 
 

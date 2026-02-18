@@ -41,8 +41,8 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 MCP_SETTINGS_PATH = SCRIPTS_DIR / "cline-config" / "cline_mcp_settings.json"
 PROMPTS_DIR = SCRIPTS_DIR / "prompts"
 SCREENSHOTS_DIR = REPO_ROOT / "screenshots"
-MAX_HEAL_ATTEMPTS = 5
-CLINE_TIMEOUT = 1800  # 30 minutes per Cline invocation
+MAX_CODING_ATTEMPTS = 3
+CODING_TIMEOUT = 1800  # 30 minutes per Cline coding attempt
 
 
 def load_prompt_template(name: str, **kwargs: str) -> str:
@@ -60,9 +60,9 @@ def load_prompt_template(name: str, **kwargs: str) -> str:
 def start_server() -> subprocess.Popen:
     logger.info("Starting backend server...")
 
-    # Install backend deps first
+    # Install backend deps first (use ci for reproducible installs)
     subprocess.run(
-        ["npm", "install"],
+        ["npm", "ci"],
         cwd=str(REPO_ROOT / "backend"),
         capture_output=True,
         text=True,
@@ -112,13 +112,17 @@ def stop_server(proc: subprocess.Popen) -> None:
 def run_tests() -> tuple[bool, str]:
     logger.info("Running tests...")
 
-    result = subprocess.run(
-        ["npm", "test"],
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
+    try:
+        result = subprocess.run(
+            ["npm", "test"],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired:
+        logger.warning("Tests timed out after 120s")
+        return False, "Tests timed out after 120s"
 
     output = result.stdout + "\n" + result.stderr
     success = result.returncode == 0
@@ -130,6 +134,29 @@ def run_tests() -> tuple[bool, str]:
         logger.debug(f"Test output:\n{output}")
 
     return success, output
+
+
+def get_git_diff() -> str:
+    """Return the current uncommitted diff (truncated for prompt use)."""
+    result = subprocess.run(
+        ["git", "diff", "HEAD"],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    diff = result.stdout.strip()
+    if not diff:
+        # Also check untracked files
+        result = subprocess.run(
+            ["git", "status", "--short"],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        diff = result.stdout.strip()
+    return diff[:5000]
 
 
 def get_repo_name() -> str:
@@ -200,13 +227,17 @@ def main() -> None:
         mcp_settings_path=MCP_SETTINGS_PATH,
     )
     vision_cline = ClineRunner(
-        cline_dir=REPO_ROOT / ".cline-agent",
-        model="anthropic/claude-haiku-4.5",
+        cline_dir=REPO_ROOT / ".cline-vision",
+        model="google/gemini-2.5-flash-preview",
         mcp_settings_path=MCP_SETTINGS_PATH,
     )
 
     # ── 6. Start backend server ─────────────────────────────────
     server = start_server()
+
+    # Initialize screenshot paths before try so they're always defined
+    before_path = None
+    after_path = None
 
     try:
         # ── 7. Before screenshot ────────────────────────────────
@@ -219,59 +250,63 @@ def main() -> None:
             issue_body=issue.body,
         )
 
-        # ── 8. TDD coding phase ────────────────────────────────
+        # ── 8. Coding loop (TDD + retry with progress check) ─────
         logger.info("=" * 40)
-        logger.info("TDD CODING PHASE")
-        logger.info("=" * 40)
-
-        tdd_prompt = load_prompt_template(
-            "tdd_prompt.md",
-            ISSUE_NUMBER=str(issue.number),
-            ISSUE_TITLE=issue.title,
-            ISSUE_BODY=issue.body,
-            SCREENSHOTS_DIR=str(SCREENSHOTS_DIR),
-        )
-
-        try:
-            coding_cline.run(tdd_prompt, timeout=CLINE_TIMEOUT, cwd=REPO_ROOT)
-        except ClineError as e:
-            logger.error(f"TDD phase failed: {e}")
-            logger.info("Attempting to continue with self-healing...")
-
-        # ── 9. Self-healing test loop ───────────────────────────
-        logger.info("=" * 40)
-        logger.info("SELF-HEALING TEST LOOP")
+        logger.info("CODING LOOP")
         logger.info("=" * 40)
 
         tests_passed = False
-        heal_attempts = 0
+        coding_attempts = 0
 
-        for attempt in range(1, MAX_HEAL_ATTEMPTS + 1):
-            heal_attempts = attempt
-            success, test_output = run_tests()
+        for attempt in range(1, MAX_CODING_ATTEMPTS + 1):
+            coding_attempts = attempt
+            logger.info(f"--- Coding attempt {attempt}/{MAX_CODING_ATTEMPTS} ---")
 
-            if success:
-                tests_passed = True
-                logger.info(f"All tests passed on attempt {attempt}")
-                break
-
-            logger.warning(f"Tests failed (attempt {attempt}/{MAX_HEAL_ATTEMPTS})")
-
-            if attempt < MAX_HEAL_ATTEMPTS:
-                heal_prompt = load_prompt_template(
-                    "heal_prompt.md",
+            if attempt == 1:
+                # First attempt: fresh TDD prompt
+                prompt = load_prompt_template(
+                    "tdd_prompt.md",
                     ISSUE_NUMBER=str(issue.number),
                     ISSUE_TITLE=issue.title,
-                    TEST_OUTPUT=test_output[:5000],  # Truncate to avoid prompt overflow
+                    ISSUE_BODY=issue.body,
+                    SCREENSHOTS_DIR=str(SCREENSHOTS_DIR),
+                )
+            else:
+                # Subsequent attempts: check progress, build continuation prompt
+                diff = get_git_diff()
+                test_ok, test_output = run_tests()
+
+                if test_ok:
+                    tests_passed = True
+                    logger.info(f"Tests passed on attempt {attempt} (before running Cline)")
+                    break
+
+                logger.info(f"Progress so far: {len(diff)} chars of diff")
+                prompt = load_prompt_template(
+                    "continue_prompt.md",
+                    ISSUE_NUMBER=str(issue.number),
+                    ISSUE_TITLE=issue.title,
+                    ISSUE_BODY=issue.body,
+                    GIT_DIFF=diff,
+                    TEST_OUTPUT=test_output[:3000],
                 )
 
-                try:
-                    coding_cline.run(heal_prompt, timeout=CLINE_TIMEOUT, cwd=REPO_ROOT)
-                except ClineError as e:
-                    logger.error(f"Heal attempt {attempt} failed: {e}")
+            try:
+                coding_cline.run(prompt, timeout=CODING_TIMEOUT, cwd=REPO_ROOT)
+            except ClineError as e:
+                logger.warning(f"Coding attempt {attempt} ended: {e}")
+                continue
 
+        # Final test check after last attempt
         if not tests_passed:
-            logger.warning("Tests still failing after all heal attempts. Proceeding with PR.")
+            success, _ = run_tests()
+            if success:
+                tests_passed = True
+                logger.info("Tests passed after final attempt")
+            else:
+                logger.warning(
+                    f"Tests still failing after {coding_attempts} attempts. Proceeding with PR."
+                )
 
         # ── 10. After screenshot ────────────────────────────────
         logger.info("Taking 'after' screenshot...")
@@ -305,13 +340,13 @@ def main() -> None:
     try:
         commit_and_push(commit_message, branch)
     except GitError as e:
-        error_msg = f"No changes produced by the agent: {e}"
-        logger.error(error_msg)
+        error_msg = str(e)
+        logger.error(f"Commit/push failed: {error_msg}")
         post_issue_comment(
             issue.number,
             format_summary({"status": "failed", "issue_number": issue.number, "error": error_msg}),
         )
-        raise RuntimeError(error_msg) from e
+        raise RuntimeError(f"Commit/push failed: {error_msg}") from e
 
     # ── 12. Create PR ───────────────────────────────────────────
     repo_name = get_repo_name()
@@ -330,7 +365,7 @@ def main() -> None:
         f"### Changes\n"
         f"This PR was automatically generated by Ralph Agent to resolve #{issue.number}.\n\n"
         f"### Test Status\n"
-        f"{test_status} (self-healing attempts: {heal_attempts})\n\n"
+        f"{test_status} (coding attempts: {coding_attempts})\n\n"
         f"{screenshots_md}\n\n"
         f"---\n"
         f"*Generated by Ralph Autofix Agent*"
@@ -353,6 +388,7 @@ def main() -> None:
             f.write(f"pr_number={pr_number}\n")
             f.write(f"pr_url={pr_url}\n")
             f.write(f"branch={branch}\n")
+            f.flush()
 
     # ── 13. Post summary on issue ───────────────────────────────
     try:
@@ -363,7 +399,7 @@ def main() -> None:
                 "issue_number": issue.number,
                 "pr_url": pr_url,
                 "tests_passed": tests_passed,
-                "heal_attempts": heal_attempts,
+                "coding_attempts": coding_attempts,
             }),
         )
     except GitError as e:

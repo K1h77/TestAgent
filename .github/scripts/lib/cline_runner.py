@@ -12,11 +12,48 @@ import shutil
 import subprocess
 import threading
 import time as _time
+import urllib.request
+import urllib.error
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+# If no activity (stdout, stderr, OR OpenRouter usage) for this long, assume stuck
+IDLE_TIMEOUT = 300  # 5 minutes
+
+# Patterns that indicate Cline is waiting for interactive input
+_STUCK_PATTERNS = [
+    "Do you want to proceed",
+    "Press Enter",
+    "(Y/n)",
+    "(y/N)",
+    "Approve?",
+    "waiting for approval",
+    "Please run 'cline auth'",
+]
+
+
+def _get_openrouter_usage() -> Optional[float]:
+    """Query OpenRouter API for current usage (credits consumed).
+
+    Returns the usage value, or None if the API call fails.
+    """
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if not api_key:
+        return None
+    try:
+        req = urllib.request.Request(
+            "https://openrouter.ai/api/v1/key",
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+            return data.get("data", {}).get("usage")
+    except Exception as e:
+        logger.debug(f"OpenRouter usage check failed: {e}")
+        return None
 
 
 class ClineError(Exception):
@@ -115,34 +152,36 @@ class ClineRunner:
         data_dir = self.cline_dir / "data"
         data_dir.mkdir(parents=True, exist_ok=True)
 
-        # Copy MCP settings if provided
+        # Copy MCP settings if provided — always overwrite so changes take effect on re-runs
+        # CLI expects: <CLINE_DIR>/data/settings/cline_mcp_settings.json
         if self.mcp_settings_path and self.mcp_settings_path.exists():
-            dest = self.cline_dir / "cline_mcp_settings.json"
-            if not dest.exists():
-                import shutil as sh
-                sh.copy2(self.mcp_settings_path, dest)
-                logger.debug(f"Copied MCP settings to {dest}")
+            settings_dir = data_dir / "settings"
+            settings_dir.mkdir(parents=True, exist_ok=True)
+            dest = settings_dir / "cline_mcp_settings.json"
+            import shutil as sh
+            sh.copy2(self.mcp_settings_path, dest)
+            logger.debug(f"Copied MCP settings to {dest}")
 
-        # Write auth config so Cline doesn't prompt interactively
+        # Write auth config so Cline doesn't prompt interactively.
+        # Always overwrite so model changes and key rotations take effect.
         global_state = data_dir / "globalState.json"
-        if not global_state.exists():
-            api_key = os.environ.get("OPENROUTER_API_KEY", "")
-            state = {
-                "welcomeViewCompleted": True,
-                "actModeApiProvider": "openrouter",
-                "actModeApiModelId": self.model,
-                "planModeApiProvider": "openrouter",
-                "planModeApiModelId": self.plan_model,
-            }
-            global_state.write_text(json.dumps(state, indent=2), encoding="utf-8")
-            logger.debug(f"Wrote globalState.json to {global_state}")
+        api_key = os.environ.get("OPENROUTER_API_KEY", "")
+        state = {
+            "welcomeViewCompleted": True,
+            "actModeApiProvider": "openrouter",
+            "actModeApiModelId": self.model,
+            "planModeApiProvider": "openrouter",
+            "planModeApiModelId": self.plan_model,
+        }
+        global_state.write_text(json.dumps(state, indent=2), encoding="utf-8")
+        logger.debug(f"Wrote globalState.json to {global_state}")
 
-            if api_key:
-                secrets_file = data_dir / "secrets.json"
-                secrets_file.write_text(
-                    json.dumps({"openRouterApiKey": api_key}), encoding="utf-8"
-                )
-                logger.debug(f"Wrote secrets.json to {secrets_file}")
+        if api_key:
+            secrets_file = data_dir / "secrets.json"
+            secrets_file.write_text(
+                json.dumps({"openRouterApiKey": api_key}), encoding="utf-8"
+            )
+            logger.debug(f"Wrote secrets.json to {secrets_file}")
 
     def run(
         self,
@@ -189,13 +228,31 @@ class ClineRunner:
 
         stdout_lines: list[str] = []
         stderr_lines: list[str] = []
+        last_activity = _time.monotonic()
+        stuck_reason: Optional[str] = None
+        lock = threading.Lock()
 
         def _reader(stream, lines: list[str], label: str) -> None:
             """Read lines from a stream in a background thread."""
+            nonlocal last_activity, stuck_reason
             for raw in stream:
                 line = raw.rstrip("\n")
                 lines.append(line)
-                logger.debug(f"[cline {label}] {line}")
+                with lock:
+                    last_activity = _time.monotonic()
+                # Stderr carries Cline's live status messages (task start, errors, tool use).
+                # Log at INFO so they're visible in CI without verbose mode.
+                # Stdout is the final summary blob — keep at DEBUG.
+                if label == "stderr" and line.strip():
+                    logger.info(f"[cline] {line}")
+                else:
+                    logger.debug(f"[cline {label}] {line}")
+                # Check for patterns that indicate Cline is stuck
+                for pattern in _STUCK_PATTERNS:
+                    if pattern.lower() in line.lower():
+                        with lock:
+                            stuck_reason = f"Detected stuck pattern: '{pattern}' in: {line}"
+                        return  # stop reading, main loop will kill
 
         try:
             proc = subprocess.Popen(
@@ -217,15 +274,76 @@ class ClineRunner:
             t_out.start()
             t_err.start()
 
-            # Wait for process with our own timeout (Cline has --timeout too,
-            # but we add a 30s grace period before hard-killing)
+            # Snapshot OpenRouter usage baseline for idle detection
+            last_usage = _get_openrouter_usage()
+
+            # Wait for process, checking for stuck/idle/timeout
             deadline = _time.monotonic() + timeout + 30
+            check_count = 0
             while proc.poll() is None:
-                remaining = deadline - _time.monotonic()
-                if remaining <= 0:
+                now = _time.monotonic()
+
+                # Hard timeout
+                if now >= deadline:
                     proc.kill()
                     proc.wait()
                     raise subprocess.TimeoutExpired(cmd, timeout)
+
+                # Check stuck patterns from reader threads
+                with lock:
+                    reason = stuck_reason
+                if reason:
+                    logger.warning(f"Killing Cline: {reason}")
+                    proc.kill()
+                    proc.wait()
+                    raise ClineError(
+                        f"Cline appears stuck: {reason}",
+                        stdout="\n".join(stdout_lines),
+                        stderr="\n".join(stderr_lines),
+                        exit_code=-1,
+                    )
+
+                # Heartbeat every 30s: log at INFO so the run is visibly alive in CI.
+                check_count += 1
+                if check_count % 30 == 0:
+                    current_usage = _get_openrouter_usage()
+                    with lock:
+                        if current_usage is not None and last_usage is not None:
+                            if current_usage > last_usage:
+                                last_activity = now
+                        idle_secs = now - last_activity
+
+                    if idle_secs > IDLE_TIMEOUT:
+                        logger.warning(
+                            f"Killing Cline: no activity for {int(idle_secs)}s "
+                            f"(no stdout and no OpenRouter usage change)"
+                        )
+                        proc.kill()
+                        proc.wait()
+                        raise ClineError(
+                            f"Cline idle for {int(idle_secs)}s — no output or API activity",
+                            stdout="\n".join(stdout_lines),
+                            stderr="\n".join(stderr_lines),
+                            exit_code=-1,
+                        )
+                    else:
+                        elapsed = int(now - (deadline - timeout - 30))
+                        if current_usage is not None and last_usage is not None:
+                            delta = current_usage - last_usage
+                            usage_str = f" | spent +${delta:.4f} (total ${current_usage:.4f})"
+                        elif current_usage is not None:
+                            usage_str = f" | usage=${current_usage:.4f}"
+                        else:
+                            usage_str = ""
+                        logger.info(
+                            f"Cline running: {elapsed}s elapsed"
+                            f" | idle {int(idle_secs)}s"
+                            f" | {len(stdout_lines)} output lines"
+                            f"{usage_str}"
+                        )
+                    if current_usage is not None:
+                        last_usage = current_usage
+
                 _time.sleep(1)
 
             # Process exited — let reader threads finish draining

@@ -59,13 +59,13 @@ def format_summary(details: dict) -> str:
     elif status == "pr_created":
         pr_url = details.get("pr_url", "")
         tests_passed = details.get("tests_passed", False)
-        heal_attempts = details.get("heal_attempts", 0)
+        coding_attempts = details.get("coding_attempts", 0)
         lines.append(f"**Ralph Agent** has created a fix: {pr_url}")
         lines.append("")
         test_status = "passing" if tests_passed else "partially passing"
         lines.append(f"- Tests: {test_status}")
-        if heal_attempts > 1:
-            lines.append(f"- Self-healing attempts: {heal_attempts}")
+        if coding_attempts:
+            lines.append(f"- Coding attempts: {coding_attempts}")
     elif status == "failed":
         error = details.get("error", "Unknown error")
         lines.append(f"**Ralph Agent** failed to fix issue #{issue_number}.")
