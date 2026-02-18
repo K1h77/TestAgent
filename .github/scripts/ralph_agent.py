@@ -44,19 +44,7 @@ MAX_HEAL_ATTEMPTS = 5
 CLINE_TIMEOUT = 600  # 10 minutes per Cline invocation
 
 
-def load_template(name: str, **kwargs: str) -> str:
-    """Load a prompt template and substitute placeholders.
-
-    Args:
-        name: Template filename (e.g., 'tdd_prompt.md').
-        **kwargs: Placeholder values (e.g., ISSUE_NUMBER='42').
-
-    Returns:
-        Template with placeholders replaced.
-
-    Raises:
-        FileNotFoundError: If template does not exist.
-    """
+def load_prompt_template(name: str, **kwargs: str) -> str:
     path = PROMPTS_DIR / name
     if not path.exists():
         raise FileNotFoundError(f"Prompt template not found: {path}")
@@ -69,14 +57,6 @@ def load_template(name: str, **kwargs: str) -> str:
 
 
 def start_server() -> subprocess.Popen:
-    """Start the Express backend server.
-
-    Returns:
-        Popen process handle.
-
-    Raises:
-        RuntimeError: If server fails to start within 30 seconds.
-    """
     logger.info("Starting backend server...")
 
     # Install backend deps first
@@ -119,7 +99,6 @@ def start_server() -> subprocess.Popen:
 
 
 def stop_server(proc: subprocess.Popen) -> None:
-    """Stop the backend server process."""
     if proc and proc.poll() is None:
         proc.terminate()
         try:
@@ -130,11 +109,6 @@ def stop_server(proc: subprocess.Popen) -> None:
 
 
 def run_tests() -> tuple[bool, str]:
-    """Run the project test suite.
-
-    Returns:
-        Tuple of (success: bool, output: str).
-    """
     logger.info("Running tests...")
 
     result = subprocess.run(
@@ -158,7 +132,6 @@ def run_tests() -> tuple[bool, str]:
 
 
 def get_repo_name() -> str:
-    """Get the GitHub repo name in 'owner/repo' format from git remote."""
     try:
         result = subprocess.run(
             ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
@@ -204,7 +177,7 @@ def main() -> None:
     configure_git_user()
 
     # ── 3. Create branch ────────────────────────────────────────
-    branch = f"ralph/issue-{issue.number}"
+    branch = f"ralph/issue-{issue.number}-{issue.title.lower().replace(' ', '-')}"
     create_branch(branch)
     logger.info(f"Branch created: {branch}")
 
@@ -238,6 +211,9 @@ def main() -> None:
             vision_cline,
             SCREENSHOTS_DIR / "before.png",
             "before",
+            issue_number=issue.number,
+            issue_title=issue.title,
+            issue_body=issue.body,
         )
 
         # ── 8. TDD coding phase ────────────────────────────────
@@ -245,7 +221,7 @@ def main() -> None:
         logger.info("TDD CODING PHASE")
         logger.info("=" * 40)
 
-        tdd_prompt = load_template(
+        tdd_prompt = load_prompt_template(
             "tdd_prompt.md",
             ISSUE_NUMBER=str(issue.number),
             ISSUE_TITLE=issue.title,
@@ -279,7 +255,7 @@ def main() -> None:
             logger.warning(f"Tests failed (attempt {attempt}/{MAX_HEAL_ATTEMPTS})")
 
             if attempt < MAX_HEAL_ATTEMPTS:
-                heal_prompt = load_template(
+                heal_prompt = load_prompt_template(
                     "heal_prompt.md",
                     ISSUE_NUMBER=str(issue.number),
                     ISSUE_TITLE=issue.title,
@@ -304,6 +280,9 @@ def main() -> None:
             vision_cline,
             SCREENSHOTS_DIR / "after.png",
             "after",
+            issue_number=issue.number,
+            issue_title=issue.title,
+            issue_body=issue.body,
         )
 
     finally:

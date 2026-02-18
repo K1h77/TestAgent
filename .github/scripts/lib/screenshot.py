@@ -19,33 +19,44 @@ class ScreenshotError(Exception):
 
 SCREENSHOT_PROMPT_TEMPLATE = (
     "Using the Playwright MCP server, do the following:\n"
-    "1. Navigate to http://localhost:3000\n"
-    "2. If there is a login form, enter 'testuser' as username and 'password' as password and submit\n"
-    "3. Wait for the main page to fully load\n"
-    "4. Take a screenshot and save it to: {output_path}\n"
     "\n"
-    "This is the '{label}' screenshot. Make sure the screenshot captures the full page."
+    "## Context\n"
+    "You are capturing a '{label}' screenshot for this GitHub issue:\n"
+    "- **Issue #{issue_number}:** {issue_title}\n"
+    "- **Description:** {issue_body}\n"
+    "\n"
+    "## Instructions\n"
+    "The app is running at http://localhost:3000.\n"
+    "Based on the issue description, figure out which page and interaction "
+    "best demonstrates the relevant area of the app. This may involve:\n"
+    "- Navigating to a specific route (not just the homepage)\n"
+    "- Clicking buttons, filling out forms, or triggering UI states\n"
+    "- Scrolling to a specific section\n"
+    "\n"
+    "If there is a login form blocking you, use 'testuser' / 'password'.\n"
+    "\n"
+    "Once you have navigated to the relevant state, take a full-page screenshot "
+    "and save it to: {output_path}\n"
 )
 
 
-def take_screenshot(cline_runner, output_path: Path, label: str) -> Optional[Path]:
-    """Take a screenshot using Cline + Playwright MCP.
-
-    Args:
-        cline_runner: ClineRunner instance (should use multimodal model).
-        output_path: Where to save the screenshot.
-        label: Label for logging ('before' or 'after').
-
-    Returns:
-        Path to the screenshot if successful, None if screenshot failed
-        (screenshots are non-blocking — failure is logged as warning).
-    """
+def take_screenshot(
+    cline_runner,
+    output_path: Path,
+    label: str,
+    issue_number: int = 0,
+    issue_title: str = "",
+    issue_body: str = "",
+) -> Optional[Path]:
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     prompt = SCREENSHOT_PROMPT_TEMPLATE.format(
         output_path=str(output_path),
         label=label,
+        issue_number=issue_number,
+        issue_title=issue_title,
+        issue_body=issue_body[:2000],
     )
 
     logger.info(f"Taking '{label}' screenshot → {output_path}")
@@ -82,19 +93,6 @@ def embed_screenshots_markdown(
     branch: str,
     repo: str,
 ) -> str:
-    """Generate markdown for embedding before/after screenshots in PR body.
-
-    Uses raw GitHub URLs so images render directly in the PR.
-
-    Args:
-        before_path: Path to before screenshot (or None).
-        after_path: Path to after screenshot (or None).
-        branch: Git branch name.
-        repo: GitHub repo in 'owner/repo' format.
-
-    Returns:
-        Markdown string with embedded images.
-    """
     lines = ["### Screenshots", ""]
 
     if before_path is None and after_path is None:
@@ -120,11 +118,6 @@ def embed_screenshots_markdown(
 
 
 def _to_relative_path(path: Path) -> str:
-    """Convert an absolute path to a repo-relative path.
-
-    Looks for 'screenshots/' in the path and returns from that point.
-    Falls back to the filename if the pattern isn't found.
-    """
     parts = Path(path).parts
     for i, part in enumerate(parts):
         if part == "screenshots":
