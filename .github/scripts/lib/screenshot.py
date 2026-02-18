@@ -194,8 +194,11 @@ def take_after_screenshot_with_review(
     if not selected_paths:
         candidates = sorted(screenshots_dir.glob("after_*.png"), key=lambda p: p.name)
         if not candidates:
-            # Last resort: any PNG in the dir
-            candidates = sorted(screenshots_dir.glob("*.png"), key=lambda p: p.stat().st_mtime)
+            # Last resort: any PNG in the dir, but never include before.png
+            candidates = sorted(
+                (p for p in screenshots_dir.glob("*.png") if p.name != "before.png"),
+                key=lambda p: p.stat().st_mtime,
+            )
         selected_paths = [p for p in candidates if p.stat().st_size > 0]
         if selected_paths:
             logger.warning(

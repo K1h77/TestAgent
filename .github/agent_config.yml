@@ -29,7 +29,7 @@ timeouts:
   review_seconds: 600
   # Seconds allowed for each review-fix pass (10 min)
   fix_seconds: 600
-  # Seconds allowed for screenshot + visual QA (5 min)
-  screenshot_seconds: 300
+  # Seconds allowed for screenshot + visual QA (10 min)
+  screenshot_seconds: 600
   # Seconds allowed for `npm test` runs (2 min)
   test_seconds: 120
