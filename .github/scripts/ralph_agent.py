@@ -163,6 +163,32 @@ def get_git_diff() -> str:
     return diff[:5000]
 
 
+_FRONTEND_EXTENSIONS = {".html", ".css", ".js", ".jsx", ".ts", ".tsx", ".vue", ".svelte"}
+
+
+def get_frontend_diff() -> str:
+    """Return the committed diff filtered to frontend file types only."""
+    result = subprocess.run(
+        ["git", "diff", "main..HEAD", "--", "*.html", "*.css", "*.js", "*.jsx", "*.ts", "*.tsx", "*.vue", "*.svelte"],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    diff = result.stdout.strip()
+    if not diff:
+        # Fall back to uncommitted changes
+        result = subprocess.run(
+            ["git", "diff", "HEAD", "--", "*.html", "*.css", "*.js", "*.jsx", "*.ts", "*.tsx", "*.vue", "*.svelte"],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        diff = result.stdout.strip()
+    return diff
+
+
 def get_repo_name() -> str:
     try:
         result = subprocess.run(
@@ -329,12 +355,16 @@ def main() -> None:
             time.sleep(2)
             server = start_server()
 
+            frontend_diff = get_frontend_diff()
+            logger.info(f"Frontend diff for visual review: {len(frontend_diff)} chars")
+
             after_paths, _ = take_after_screenshot_with_review(
                 vision_cline,
                 SCREENSHOTS_DIR / "after.png",
                 issue_number=issue.number,
                 issue_title=issue.title,
                 issue_body=issue.body,
+                frontend_diff=frontend_diff,
                 timeout=_cfg.timeouts.screenshot_seconds,
             )
 

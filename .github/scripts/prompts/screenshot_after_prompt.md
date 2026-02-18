@@ -2,10 +2,19 @@ Using the Playwright MCP server ONLY (do NOT read files or run shell commands),
 do a thorough visual QA for GitHub issue #{{ISSUE_NUMBER}}: {{ISSUE_TITLE}}
 Issue description: {{ISSUE_BODY}}
 
+## What changed (frontend files only)
+The following diff shows exactly which HTML/CSS/JS/TS files were modified.
+Use this to know *where* to look — which pages, components, or styles to check.
+
+```diff
+{{FRONTEND_DIFF}}
+```
+
 ## Step 1 — Explore and capture screenshots
 1. Launch a browser and navigate to http://localhost:3000
 2. If a login form is present, log in with username 'testuser' and password 'password'
-3. Explore the app thoroughly to verify the feature described in the issue.
+3. Navigate to the areas indicated by the diff above and explore the app thoroughly
+   to verify the feature described in the issue.
    Take as many screenshots as you need to check:
    - The feature in its default/idle state
    - The feature after interaction (e.g. toggle activated, modal open, state changed)

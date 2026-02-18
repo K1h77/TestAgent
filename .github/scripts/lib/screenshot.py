@@ -132,6 +132,7 @@ def take_after_screenshot_with_review(
     issue_number: int = 0,
     issue_title: str = "",
     issue_body: str = "",
+    frontend_diff: str = "",
     timeout: int = 300,
 ) -> tuple[list[Path], Optional[Path]]:
     """Take after screenshots and run an inline visual QA review.
@@ -152,6 +153,7 @@ def take_after_screenshot_with_review(
         ISSUE_NUMBER=str(issue_number),
         ISSUE_TITLE=issue_title,
         ISSUE_BODY=issue_body[:2000],
+        FRONTEND_DIFF=frontend_diff[:6000] if frontend_diff else "(no frontend files changed)",
     )
 
     logger.info(f"Taking 'after' screenshots + visual review → {screenshots_dir}")
