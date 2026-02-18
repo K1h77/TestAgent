@@ -44,34 +44,40 @@ class TestCreateBranch:
             return result
 
         mock_git.side_effect = side_effect
-        create_branch("ralph/issue-42")
+        actual_branch = create_branch("ralph/issue-42")
 
+        assert actual_branch == "ralph/issue-42"
         calls = [c.args[0] for c in mock_git.call_args_list]
         assert ["fetch", "origin"] in calls
         assert ["ls-remote", "--heads", "origin", "ralph/issue-42"] in calls
         assert ["checkout", "-b", "ralph/issue-42"] in calls
 
     @patch("lib.git_ops._run_git")
-    def test_calls_git_checkout_existing_remote_branch(self, mock_git):
-        """When branch already exists on remote (re-run), should checkout and reset."""
+    def test_creates_versioned_branch_when_base_exists(self, mock_git):
+        """When branch already exists on remote, should create -v2 version."""
         def side_effect(args, check=True):
             result = MagicMock()
             result.returncode = 0
-            # ls-remote returns a non-empty ref → branch exists remotely
             if args[0] == "ls-remote":
-                result.stdout = "abc123\trefs/heads/ralph/issue-42\n"
+                # First call: base branch exists
+                # Second call: -v2 does not exist
+                if "ralph/issue-42-v2" in args:
+                    result.stdout = ""
+                else:
+                    result.stdout = "abc123\trefs/heads/ralph/issue-42\n"
             else:
                 result.stdout = ""
             return result
 
         mock_git.side_effect = side_effect
-        create_branch("ralph/issue-42")
+        actual_branch = create_branch("ralph/issue-42")
 
+        assert actual_branch == "ralph/issue-42-v2"
         calls = [c.args[0] for c in mock_git.call_args_list]
-        assert ["checkout", "ralph/issue-42"] in calls
-        assert ["reset", "--hard", "origin/ralph/issue-42"] in calls
-        # Should NOT call checkout -b
-        assert ["checkout", "-b", "ralph/issue-42"] not in calls
+        assert ["checkout", "-b", "ralph/issue-42-v2"] in calls
+        # Should NOT try to checkout/reset the existing branch
+        assert ["checkout", "ralph/issue-42"] not in calls
+        assert ["reset", "--hard", "origin/ralph/issue-42"] not in calls
 
     @patch("lib.git_ops._run_git")
     def test_git_failure_raises(self, mock_git):

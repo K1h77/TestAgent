@@ -7,6 +7,12 @@ dist/
 build/
 .aider*
 
+# Python bytecode cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
 # Cline agent working directories — contain secrets.json with the OpenRouter API key
 .cline-*/
 .cline-agent/

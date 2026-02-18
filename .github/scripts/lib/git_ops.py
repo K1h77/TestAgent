@@ -91,14 +91,18 @@ def configure_git_user(name: str = "Ralph Bot", email: str = "ralph-bot@users.no
     logger.info(f"Git user configured: {name} <{email}>")
 
 
-def create_branch(name: str) -> None:
+def create_branch(name: str) -> str:
     """Create and checkout a new branch from current HEAD.
 
-    If the branch already exists on the remote (e.g. from a prior cancelled
-    run), checks it out and resets it to the remote state instead of failing.
+    If the branch already exists on the remote, finds a unique name by
+    appending -v2, -v3, etc. This allows multiple concurrent runs for the
+    same issue without conflicts.
 
     Args:
-        name: Branch name.
+        name: Desired branch name.
+
+    Returns:
+        The actual branch name created (may differ from input if collision occurred).
 
     Raises:
         GitError: If branch creation fails.
@@ -112,20 +116,46 @@ def create_branch(name: str) -> None:
     # Fetch so we have up-to-date remote refs
     _run_git(["fetch", "origin"], check=False)
 
-    # Check if the branch already exists on the remote
-    ls = _run_git(["ls-remote", "--heads", "origin", name], check=False)
-    if ls.stdout.strip():
-        # Remote branch exists — reuse it, reset to remote state
-        logger.warning(
-            f"Branch '{name}' already exists on remote (prior run?). "
-            f"Checking out and resetting to origin/{name}."
-        )
-        _run_git(["checkout", name])
-        _run_git(["reset", "--hard", f"origin/{name}"])
-    else:
-        _run_git(["checkout", "-b", name])
+    # Clean up Python cache files that may block checkout
+    # (created by workflow unit tests before agent runs)
+    import shutil
+    from pathlib import Path
+    for pycache_dir in Path(".").rglob("__pycache__"):
+        try:
+            shutil.rmtree(pycache_dir)
+            logger.debug(f"Removed {pycache_dir}")
+        except Exception as e:
+            logger.debug(f"Failed to remove {pycache_dir}: {e}")
 
-    logger.info(f"On branch: {name}")
+    # Find a unique branch name if the base name already exists
+    unique_name = name
+    version = 2
+    max_attempts = 20  # Prevent infinite loop
+    
+    while version <= max_attempts:
+        ls = _run_git(["ls-remote", "--heads", "origin", unique_name], check=False)
+        if not ls.stdout.strip():
+            # Branch doesn't exist on remote — use it
+            break
+        
+        # Branch exists, try next version
+        logger.info(f"Branch '{unique_name}' already exists on remote, trying next version...")
+        unique_name = f"{name}-v{version}"
+        version += 1
+    
+    if version > max_attempts:
+        raise GitError(
+            f"Could not find unique branch name after {max_attempts} attempts. "
+            f"Too many existing branches for issue. Consider cleaning up old branches."
+        )
+    
+    if unique_name != name:
+        logger.warning(f"Original branch '{name}' exists. Using '{unique_name}' instead.")
+    
+    _run_git(["checkout", "-b", unique_name])
+    logger.info(f"On branch: {unique_name}")
+    
+    return unique_name
 
 
 def commit_and_push(message: str, branch: str) -> None:

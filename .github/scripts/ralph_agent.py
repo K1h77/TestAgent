@@ -242,8 +242,8 @@ def main() -> None:
 
     # ── 3. Create branch ────────────────────────────────────────
     slug = re.sub(r"[^a-z0-9]+", "-", issue.title.lower()).strip("-")[:50].rstrip("-")
-    branch = f"ralph/issue-{issue.number}-{slug}"
-    create_branch(branch)
+    desired_branch = f"ralph/issue-{issue.number}-{slug}"
+    branch = create_branch(desired_branch)  # Returns actual branch name (may have -v2, -v3, etc.)
     logger.info(f"Branch created: {branch}")
 
     # ── 4. Post "working on it" comment ─────────────────────────
