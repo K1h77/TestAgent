@@ -169,28 +169,33 @@ def take_after_screenshot_with_review(
         )
 
     # Parse the SELECTED: line from the verdict file to get the chosen screenshots
+    # Use regex to handle both "VISUAL: OK\nSELECTED: ..." and "VISUAL: OK SELECTED: ..." formats
     selected_paths: list[Path] = []
     result_verdict = verdict_path if verdict_path.exists() and verdict_path.stat().st_size > 0 else None
 
     if result_verdict:
+        import re
         verdict_text = verdict_path.read_text(encoding="utf-8").strip()
         logger.info(f"Visual verdict: {verdict_text.splitlines()[0]}")
-        for line in verdict_text.splitlines():
-            if line.strip().upper().startswith("SELECTED:"):
-                names = line.split(":", 1)[1].strip()
-                for name in names.split(","):
-                    name = name.strip()
-                    if name:
-                        p = screenshots_dir / name
-                        if p.exists() and p.stat().st_size > 0:
-                            selected_paths.append(p)
-                        else:
-                            logger.warning(f"Selected screenshot not found or empty: {p}")
-                break
+        
+        # Use regex to find SELECTED: anywhere in the text (handles both one-line and two-line formats)
+        match = re.search(r'SELECTED:\s*([^\n]+)', verdict_text, re.IGNORECASE)
+        if match:
+            names = match.group(1).strip()
+            for name in names.split(","):
+                name = name.strip()
+                if name and name.endswith(".png"):
+                    p = screenshots_dir / name
+                    if p.exists() and p.stat().st_size > 0:
+                        selected_paths.append(p)
+                    else:
+                        logger.warning(f"Selected screenshot not found or empty: {p}")
+        else:
+            logger.warning("No SELECTED line found in verdict file")
     else:
         logger.warning("Visual verdict file not written by model")
 
-    # Fallback: if no valid selections, use all PNGs in the dir that look like after_*.png
+    # Lenient fallback: if no valid selections, use ALL after_*.png files (prefer showing all over none)
     if not selected_paths:
         candidates = sorted(screenshots_dir.glob("after_*.png"), key=lambda p: p.name)
         if not candidates:
@@ -201,10 +206,12 @@ def take_after_screenshot_with_review(
             )
         selected_paths = [p for p in candidates if p.stat().st_size > 0]
         if selected_paths:
-            logger.warning(
-                f"No SELECTED line in verdict — falling back to all captured PNGs: "
+            logger.info(
+                f"No valid SELECTED line in verdict — using all captured after screenshots: "
                 f"{[p.name for p in selected_paths]}"
             )
+        else:
+            logger.warning("No screenshots found in directory at all")
 
     logger.info(f"After screenshots selected: {[p.name for p in selected_paths]}")
 

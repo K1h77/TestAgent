@@ -1,6 +1,8 @@
-Using the Playwright MCP server ONLY (do NOT read files or run shell commands),
-do a focused visual QA for GitHub issue #{{ISSUE_NUMBER}}: {{ISSUE_TITLE}}
+Using the Playwright MCP server for browser automation, do a focused visual QA
+for GitHub issue #{{ISSUE_NUMBER}}: {{ISSUE_TITLE}}
 Issue description: {{ISSUE_BODY}}
+
+**Note:** You may use shell commands for file I/O operations (writing verdict file).
 
 ## What changed (frontend files only)
 The following diff shows exactly which HTML/CSS/JS/TS files were modified.
@@ -17,11 +19,12 @@ Use this to know *where* to look — focus only on the areas the diff touches.
 ### Step 1 — Navigate and capture screenshots (max 3 screenshots)
 1. Navigate to http://localhost:3000
 2. If a login form is present, log in with username 'testuser' and password 'password'
-3. Go directly to the area changed by the diff and capture:
-   - after_01.png — the default/idle state of the changed feature
-   - after_02.png — the feature after one key interaction (e.g. click, submit, toggle) if relevant
-   - after_03.png — one extra state only if clearly needed
-   Save screenshots to: {{SCREENSHOTS_DIR}}
+3. Go directly to the area changed by the diff and capture screenshots using FULL PATHS:
+   - **{{SCREENSHOTS_DIR}}/after_01.png** — the default/idle state of the changed feature
+   - **{{SCREENSHOTS_DIR}}/after_02.png** — the feature after one key interaction (e.g. click, submit, toggle) if relevant
+   - **{{SCREENSHOTS_DIR}}/after_03.png** — one extra state only if clearly needed
+4. Verify screenshots were saved: run `ls {{SCREENSHOTS_DIR}}` to confirm PNG files exist
+
    Do NOT take more than 3 screenshots. Do NOT explore unrelated pages.
 
 ### Step 2 — Visual QA assessment
@@ -39,14 +42,15 @@ The file must contain exactly 2 lines:
     VISUAL: OK
     VISUAL: FEATURE_NOT_FOUND - <what you expected to see but didn't>
     VISUAL: ISSUE - <brief description of the problem>
-  Line 2 — selected screenshots:
+  
+  Line 2 — selected screenshots (MUST be on separate line):
     SELECTED: after_01.png, after_02.png
 
-Example:
+Example (notice the two separate lines):
   VISUAL: OK
   SELECTED: after_01.png, after_02.png
 
 IMPORTANT:
-- Use only Playwright MCP tools. Do not run shell commands.
 - Writing the verdict file is mandatory — do it immediately after taking screenshots.
+- Use shell commands (echo/write-output) to create {{VERDICT_PATH}} with the exact format above.
 - Do not keep exploring after you have enough to make a verdict.
