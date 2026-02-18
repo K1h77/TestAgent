@@ -1,6 +1,8 @@
 name: Ralph Autofix Agent
 
 on:
+  issues:
+    types: [labeled]
   workflow_dispatch:
     inputs:
       issue_number:
@@ -19,7 +21,7 @@ on:
 
 # Only one run per issue at a time.
 concurrency:
-  group: ralph-autofix-${{ inputs.issue_number }}
+  group: ralph-autofix-${{ github.event.issue.number || inputs.issue_number }}
   cancel-in-progress: false
 
 permissions:
@@ -29,14 +31,15 @@ permissions:
 
 jobs:
   autofix:
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'ralph-autofix'
     runs-on: ubuntu-latest
     timeout-minutes: 90
 
     env:
-      ISSUE_NUMBER: ${{ inputs.issue_number }}
-      ISSUE_TITLE: ${{ inputs.issue_title }}
-      ISSUE_BODY: ${{ inputs.issue_body }}
-      ISSUE_LABELS: ${{ inputs.issue_labels }}
+      ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+      ISSUE_TITLE: ${{ github.event.issue.title || inputs.issue_title }}
+      ISSUE_BODY: ${{ github.event.issue.body || inputs.issue_body }}
+      ISSUE_LABELS: ${{ join(github.event.issue.labels.*.name, ',') || inputs.issue_labels }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -125,7 +128,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ralph-screenshots-${{ inputs.issue_number }}
+          name: ralph-screenshots-${{ github.event.issue.number || inputs.issue_number }}
           path: screenshots/
           if-no-files-found: ignore
 
@@ -136,7 +139,7 @@ jobs:
         env:
           PR_NUMBER: ${{ steps.agent.outputs.pr_number }}
           BRANCH: ${{ steps.agent.outputs.branch }}
-          ISSUE_LABELS: ${{ inputs.issue_labels }}
+          ISSUE_LABELS: ${{ join(github.event.issue.labels.*.name, ',') || inputs.issue_labels }}
 
       # ── Failure Handling ──────────────────────────────────────
       - name: Post failure comment on issue
