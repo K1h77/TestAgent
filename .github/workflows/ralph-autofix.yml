@@ -86,6 +86,11 @@ jobs:
           echo "OPENROUTER_API_KEY validated successfully (HTTP 200)."
 
       # ── Run agent Python tests ────────────────────────────────
+      - name: Check agent scripts for syntax errors
+        run: |
+          find .github/scripts -name "*.py" | xargs python -m py_compile
+          echo "All Python files passed syntax check."
+
       - name: Run agent unit tests
         run: python -m pytest .github/scripts/tests/ -v --tb=short
 

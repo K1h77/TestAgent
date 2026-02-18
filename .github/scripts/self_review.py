@@ -100,7 +100,8 @@ def run_tests() -> tuple[bool, str]:
     return result.returncode == 0, output
 
 
-def self_heal_loop(fixer: ClineRunner, issue, max_attempts: int = 3) -> bool:    """Run tests with self-healing fix attempts.
+def self_heal_loop(fixer: ClineRunner, issue, max_attempts: int = 3) -> bool:
+    """Run tests with self-healing fix attempts.
 
     Args:
         fixer: ClineRunner instance for fixing code.
