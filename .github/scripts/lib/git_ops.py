@@ -298,8 +298,22 @@ def post_pr_comment(pr_number: str, body: str) -> None:
     logger.info(f"Posted comment on PR #{pr_number}")
 
 
+def _ensure_label_exists(label: str) -> None:
+    """Create the label in the repo if it doesn't already exist."""
+    label_colors = {
+        "review-passed": "0e8a16",
+        "review-needs-attention": "e4e669",
+    }
+    color = label_colors.get(label, "ededed")
+    try:
+        _run_gh(["label", "create", label, "--color", color, "--force"])
+        logger.debug(f"Ensured label '{label}' exists")
+    except GitError as e:
+        logger.warning(f"Could not ensure label '{label}' exists (non-blocking): {e}")
+
+
 def label_pr(pr_number: str, label: str) -> None:
-    """Add a label to a PR.
+    """Add a label to a PR, creating it in the repo first if needed.
 
     Args:
         pr_number: PR number.
@@ -308,5 +322,6 @@ def label_pr(pr_number: str, label: str) -> None:
     Raises:
         GitError: If labeling fails.
     """
+    _ensure_label_exists(label)
     _run_gh(["pr", "edit", pr_number, "--add-label", label])
     logger.info(f"Added label '{label}' to PR #{pr_number}")

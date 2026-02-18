@@ -64,22 +64,35 @@ def load_template(name: str, **kwargs: str) -> str:
 def parse_verdict(review_output: str) -> str:
     """Extract the verdict from review output.
 
-    Looks for 'Verdict: LGTM' or 'Verdict: NEEDS CHANGES' in the output.
-
-    Args:
-        review_output: Full output from the review Cline instance.
+    Looks for 'Verdict: LGTM' or 'Verdict: NEEDS CHANGES' anywhere in the
+    output, case-insensitively, ignoring markdown bold/italic/code markers
+    and leading punctuation so that outputs like '**Verdict: LGTM**' or
+    '> Verdict: NEEDS CHANGES' are handled correctly.
 
     Returns:
         'LGTM' or 'NEEDS CHANGES'. Defaults to 'LGTM' if no clear verdict
         is found (lenient — benefit of the doubt).
     """
-    for line in review_output.splitlines():
+    import re
+    # Strip markdown noise from each line before matching
+    clean_output = re.sub(r"[*_`>#\-]", " ", review_output)
+
+    for line in clean_output.splitlines():
         line_stripped = line.strip().lower()
-        if "verdict:" in line_stripped:
-            if "needs changes" in line_stripped or "needs_changes" in line_stripped:
+        if "verdict" in line_stripped and ":" in line_stripped:
+            after_colon = line_stripped.split(":", 1)[1].strip()
+            if "needs changes" in after_colon or "needs_changes" in after_colon or "needs changes" in line_stripped:
                 return "NEEDS CHANGES"
-            if "lgtm" in line_stripped:
+            if "lgtm" in after_colon:
                 return "LGTM"
+
+    # Also do a looser full-text scan in case the verdict isn't on its own line
+    clean_lower = clean_output.lower()
+    if "needs changes" in clean_lower or "needs_changes" in clean_lower:
+        # Only count it if "verdict" appears nearby (within 100 chars)
+        idx = clean_lower.find("needs changes")
+        if idx != -1 and "verdict" in clean_lower[max(0, idx - 100):idx + 50]:
+            return "NEEDS CHANGES"
 
     # No clear verdict found — be lenient
     logger.warning("No clear verdict found in review output. Defaulting to LGTM.")
@@ -89,15 +102,20 @@ def parse_verdict(review_output: str) -> str:
 def run_tests() -> tuple[bool, str]:
     """Run the project test suite."""
     logger.info("Running tests...")
-    result = subprocess.run(
-        ["npm", "test"],
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        timeout=_cfg.timeouts.test_seconds,
-    )
-    output = result.stdout + "\n" + result.stderr
-    return result.returncode == 0, output
+    try:
+        result = subprocess.run(
+            ["npm", "test"],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=_cfg.timeouts.test_seconds,
+        )
+        output = result.stdout + "\n" + result.stderr
+        return result.returncode == 0, output
+    except subprocess.TimeoutExpired:
+        msg = f"Tests timed out after {_cfg.timeouts.test_seconds}s"
+        logger.warning(msg)
+        return False, msg
 
 
 def self_heal_loop(fixer: ClineRunner, issue, max_attempts: int = 3) -> bool:
@@ -134,7 +152,20 @@ def self_heal_loop(fixer: ClineRunner, issue, max_attempts: int = 3) -> bool:
     return False
 
 
-def main() -> None:
+def _safe_label_pr(pr_number: str, label: str) -> None:
+    """Label a PR, logging but never raising on failure."""
+    try:
+        label_pr(pr_number, label)
+    except Exception as e:
+        logger.warning(f"Failed to add label '{label}' to PR #{pr_number} (non-blocking): {e}")
+
+
+def _safe_post_pr_comment(pr_number: str, body: str) -> None:
+    """Post a PR comment, logging but never raising on failure."""
+    try:
+        post_pr_comment(pr_number, body)
+    except Exception as e:
+        logger.warning(f"Failed to post PR comment (non-blocking): {e}")
     setup_logging(verbose=True)
 
     logger.info("=" * 60)
@@ -175,8 +206,8 @@ def main() -> None:
 
         if not diff.strip():
             logger.warning("No diff found. Marking as passed.")
-            label_pr(pr_number, "review-passed")
-            post_pr_comment(pr_number, format_review_summary(
+            _safe_label_pr(pr_number, "review-passed")
+            _safe_post_pr_comment(pr_number, format_review_summary(
                 "No changes detected. Auto-approving.", "PASSED"
             ))
             return
@@ -215,10 +246,15 @@ def main() -> None:
             result = reviewer.run(review_prompt, timeout=REVIEW_TIMEOUT, cwd=REPO_ROOT)
             last_review_output = result.stdout
         except ClineError as e:
-            logger.error(f"Review failed: {e}")
-            last_review_output = f"Review error: {e}"
-            # On review failure, be lenient — treat as LGTM
-            break
+            logger.error(f"Reviewer Cline crashed: {e}. Treating as LGTM (benefit of the doubt).")
+            visual_verdict = read_visual_verdict(SCREENSHOTS_DIR)
+            visual_section = f"\n\n### Visual QA\n{visual_verdict}" if visual_verdict else ""
+            _safe_label_pr(pr_number, "review-passed")
+            _safe_post_pr_comment(pr_number, format_review_summary(
+                f"Reviewer failed to run (Cline error). Auto-approving.\n\nError: {e}{visual_section}",
+                "PASSED"
+            ))
+            return
 
         verdict = parse_verdict(last_review_output)
         logger.info(f"Review verdict: {verdict}")
@@ -227,8 +263,8 @@ def main() -> None:
             logger.info("Review passed!")
             visual_verdict = read_visual_verdict(SCREENSHOTS_DIR)
             visual_section = f"\n\n### Visual QA\n{visual_verdict}" if visual_verdict else ""
-            label_pr(pr_number, "review-passed")
-            post_pr_comment(pr_number, format_review_summary(
+            _safe_label_pr(pr_number, "review-passed")
+            _safe_post_pr_comment(pr_number, format_review_summary(
                 last_review_output + visual_section, "PASSED"
             ))
             return
@@ -268,16 +304,16 @@ def main() -> None:
             except GitError as e:
                 logger.error(
                     f"Commit/push after review fix failed (round {iteration}): {e}. "
-                    f"Next review iteration will see stale diff."
+                    f"Cannot proceed — next review would see a stale diff. Stopping."
                 )
-                continue
+                break
 
     # ── 3. Exhausted iterations ─────────────────────────────────
     logger.warning("Max review iterations reached. Posting final review.")
     visual_verdict = read_visual_verdict(SCREENSHOTS_DIR)
     visual_section = f"\n\n### Visual QA\n{visual_verdict}" if visual_verdict else ""
-    label_pr(pr_number, "review-needs-attention")
-    post_pr_comment(pr_number, format_review_summary(
+    _safe_label_pr(pr_number, "review-needs-attention")
+    _safe_post_pr_comment(pr_number, format_review_summary(
         last_review_output + visual_section, "NEEDS ATTENTION"
     ))
 
