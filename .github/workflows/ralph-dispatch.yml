@@ -1,0 +1,31 @@
+name: Ralph Label → Dispatch
+
+# This tiny workflow is the ONLY one that listens to label events.
+# It converts a ralph-autofix label into a workflow_dispatch so that
+# ralph-autofix.yml only ever appears in Actions when it actually runs.
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  dispatch:
+    if: github.event.label.name == 'ralph-autofix'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      issues: write
+    steps:
+      - name: Remove label immediately (prevent duplicate dispatches)
+        run: gh issue edit "${{ github.event.issue.number }}" --remove-label ralph-autofix || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Dispatch ralph-autofix workflow
+        run: |
+          gh workflow run ralph-autofix.yml \
+            --ref main \
+            --field issue_number="${{ github.event.issue.number }}" \
+            --field issue_title="${{ github.event.issue.title }}" \
+            --field issue_body="${{ github.event.issue.body }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

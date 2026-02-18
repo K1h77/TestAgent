@@ -32,8 +32,8 @@ _STUCK_PATTERNS = [
 ]
 
 
-def _get_openrouter_usage() -> Optional[float]:
-    """Query OpenRouter API for current usage (credits consumed).
+def get_openrouter_usage() -> Optional[float]:
+    """Query OpenRouter API for current usage (credits consumed in USD).
 
     Returns the usage value, or None if the API call fails.
     """
@@ -53,6 +53,10 @@ def _get_openrouter_usage() -> Optional[float]:
         return None
 
 
+# Keep private alias for backward compatibility
+_get_openrouter_usage = get_openrouter_usage
+
+
 class ClineError(Exception):
     """Raised when a Cline CLI invocation fails."""
 
@@ -70,6 +74,7 @@ class ClineResult:
     stdout: str
     stderr: str
     exit_code: int
+    cost_usd: Optional[float] = None
 
     @property
     def success(self) -> bool:
@@ -206,6 +211,7 @@ class ClineRunner:
         cmd = [
             "cline",
             "-y",
+            "--model", self.model,
             "--timeout", str(timeout),
         ]
 
@@ -328,6 +334,13 @@ class ClineRunner:
             result_stderr = "\n".join(stderr_lines)
             returncode = proc.returncode
 
+            # Compute per-run cost from OpenRouter usage delta
+            final_usage = get_openrouter_usage()
+            run_cost: Optional[float] = None
+            if final_usage is not None and run_baseline is not None:
+                run_cost = max(0.0, final_usage - run_baseline)
+                logger.info(f"Cline run cost: ${run_cost:.6f} USD")
+
         except subprocess.TimeoutExpired:
             logger.error(f"Cline timed out after {timeout}s")
             raise ClineError(
@@ -348,6 +361,7 @@ class ClineRunner:
             stdout=result_stdout,
             stderr=result_stderr,
             exit_code=returncode,
+            cost_usd=run_cost,
         )
 
         if not cline_result.success:

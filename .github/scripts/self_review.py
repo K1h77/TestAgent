@@ -20,7 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from lib.agent_config import load_config
-from lib.cline_runner import ClineRunner, ClineError, READ_ONLY_PERMISSIONS
+from lib.cline_runner import ClineRunner, ClineError, READ_ONLY_PERMISSIONS, get_openrouter_usage
 from lib.git_ops import (
     commit_and_push,
     get_diff,
@@ -166,12 +166,26 @@ def _safe_post_pr_comment(pr_number: str, body: str) -> None:
         post_pr_comment(pr_number, body)
     except Exception as e:
         logger.warning(f"Failed to post PR comment (non-blocking): {e}")
+
+
+def _build_cost_section(baseline: "float | None") -> str:
+    """Return a markdown cost section string, or empty string if unavailable."""
+    final = get_openrouter_usage()
+    if final is not None and baseline is not None:
+        cost = max(0.0, final - baseline)
+        logger.info(f"Self-review total cost: ${cost:.4f} USD")
+        return f"\n\n### Review Cost\n${cost:.4f} USD (via OpenRouter)"
+    return ""
+
+
+def main() -> None:
     setup_logging(verbose=True)
 
     logger.info("=" * 60)
     logger.info("Self-Review starting")
     logger.info("=" * 60)
-
+    # Snapshot OpenRouter usage at start for review cost tracking
+    _cost_baseline = get_openrouter_usage()
     # ── 1. Validate inputs ──────────────────────────────────────
     issue = parse_issue(
         number=require_env("ISSUE_NUMBER"),
@@ -208,7 +222,7 @@ def _safe_post_pr_comment(pr_number: str, body: str) -> None:
             logger.warning("No diff found. Marking as passed.")
             _safe_label_pr(pr_number, "review-passed")
             _safe_post_pr_comment(pr_number, format_review_summary(
-                "No changes detected. Auto-approving.", "PASSED"
+                "No changes detected. Auto-approving." + _build_cost_section(_cost_baseline), "PASSED"
             ))
             return
 
@@ -251,7 +265,8 @@ def _safe_post_pr_comment(pr_number: str, body: str) -> None:
             visual_section = f"\n\n### Visual QA\n{visual_verdict}" if visual_verdict else ""
             _safe_label_pr(pr_number, "review-passed")
             _safe_post_pr_comment(pr_number, format_review_summary(
-                f"Reviewer failed to run (Cline error). Auto-approving.\n\nError: {e}{visual_section}",
+                f"Reviewer failed to run (Cline error). Auto-approving.\n\nError: {e}{visual_section}"
+                + _build_cost_section(_cost_baseline),
                 "PASSED"
             ))
             return
@@ -265,7 +280,7 @@ def _safe_post_pr_comment(pr_number: str, body: str) -> None:
             visual_section = f"\n\n### Visual QA\n{visual_verdict}" if visual_verdict else ""
             _safe_label_pr(pr_number, "review-passed")
             _safe_post_pr_comment(pr_number, format_review_summary(
-                last_review_output + visual_section, "PASSED"
+                last_review_output + visual_section + _build_cost_section(_cost_baseline), "PASSED"
             ))
             return
 
@@ -314,7 +329,7 @@ def _safe_post_pr_comment(pr_number: str, body: str) -> None:
     visual_section = f"\n\n### Visual QA\n{visual_verdict}" if visual_verdict else ""
     _safe_label_pr(pr_number, "review-needs-attention")
     _safe_post_pr_comment(pr_number, format_review_summary(
-        last_review_output + visual_section, "NEEDS ATTENTION"
+        last_review_output + visual_section + _build_cost_section(_cost_baseline), "NEEDS ATTENTION"
     ))
 
     logger.info("=" * 60)

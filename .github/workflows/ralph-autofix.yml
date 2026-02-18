@@ -1,13 +1,22 @@
 name: Ralph Autofix Agent
 
 on:
-  issues:
-    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number"
+        required: true
+      issue_title:
+        description: "Issue title"
+        required: true
+      issue_body:
+        description: "Issue body"
+        required: true
 
-# Prevent duplicate runs for the same issue
+# Only one run per issue at a time.
 concurrency:
-  group: ralph-autofix-${{ github.event.issue.number }}
-  cancel-in-progress: true
+  group: ralph-autofix-${{ inputs.issue_number }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -16,14 +25,13 @@ permissions:
 
 jobs:
   autofix:
-    if: github.event.label.name == 'ralph-autofix'
     runs-on: ubuntu-latest
     timeout-minutes: 90
 
     env:
-      ISSUE_NUMBER: ${{ github.event.issue.number }}
-      ISSUE_TITLE: ${{ github.event.issue.title }}
-      ISSUE_BODY: ${{ github.event.issue.body }}
+      ISSUE_NUMBER: ${{ inputs.issue_number }}
+      ISSUE_TITLE: ${{ inputs.issue_title }}
+      ISSUE_BODY: ${{ inputs.issue_body }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -112,7 +120,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ralph-screenshots-${{ github.event.issue.number }}
+          name: ralph-screenshots-${{ inputs.issue_number }}
           path: screenshots/
           if-no-files-found: ignore
 

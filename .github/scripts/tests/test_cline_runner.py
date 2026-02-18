@@ -159,7 +159,8 @@ class TestClineRunnerRun:
         cmd = call_args[0][0]
         assert cmd[0] == "cline"
         assert "-y" in cmd
-        assert "--model" not in cmd  # model is set via globalState.json, not CLI flag
+        assert "--model" in cmd
+        assert "minimax/minimax-m2.5" in cmd
         assert "--timeout" in cmd
 
     @patch("time.sleep")
