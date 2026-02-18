@@ -65,7 +65,7 @@ jobs:
             "actModeApiProvider": "openrouter",
             "actModeApiModelId": "minimax/minimax-m2.5",
             "planModeApiProvider": "openrouter",
-            "planModeApiModelId": "minimax/minimax-m2.5"
+            "planModeApiModelId": "google/gemini-3-flash-preview"
           }
           CONF
           echo "{\"apiKey\": \"$OPENROUTER_API_KEY\"}" > ~/.cline/data/secrets.json
