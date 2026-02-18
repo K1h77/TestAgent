@@ -55,8 +55,10 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
-      - name: Install Cline CLI
-        run: npm install -g cline
+      - name: Install Cline CLI and authenticate
+        run: |
+          npm install -g cline
+          cline auth -p openrouter -k "$OPENROUTER_API_KEY"
 
       - name: Install Playwright MCP server and browsers
         run: |

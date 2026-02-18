@@ -9,6 +9,7 @@ All failures are explicit. Nothing proceeds silently with missing data.
 
 import logging
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -177,7 +178,8 @@ def main() -> None:
     configure_git_user()
 
     # ── 3. Create branch ────────────────────────────────────────
-    branch = f"ralph/issue-{issue.number}-{issue.title.lower().replace(' ', '-')}"
+    slug = re.sub(r"[^a-z0-9]+", "-", issue.title.lower()).strip("-")[:50].rstrip("-")
+    branch = f"ralph/issue-{issue.number}-{slug}"
     create_branch(branch)
     logger.info(f"Branch created: {branch}")
 
