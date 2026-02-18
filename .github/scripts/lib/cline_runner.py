@@ -138,7 +138,7 @@ class ClineRunner:
             if api_key:
                 secrets_file = data_dir / "secrets.json"
                 secrets_file.write_text(
-                    json.dumps({"apiKey": api_key}), encoding="utf-8"
+                    json.dumps({"openRouterApiKey": api_key}), encoding="utf-8"
                 )
                 logger.debug(f"Wrote secrets.json to {secrets_file}")
 
