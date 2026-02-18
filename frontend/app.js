@@ -6,6 +6,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginContainer = document.getElementById('loginContainer');
     const mainContainer = document.getElementById('mainContainer');
     
+    // Initialize dark mode
+    initDarkMode();
+    
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         // Mock login - any credentials work
@@ -139,6 +142,30 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// Dark mode functionality
+function initDarkMode() {
+    const darkModeSwitch = document.getElementById('darkModeSwitch');
+    const body = document.body;
+    
+    // Check localStorage for saved preference
+    const isDarkMode = localStorage.getItem('darkMode') === 'true';
+    
+    // Apply initial state
+    if (isDarkMode) {
+        body.classList.add('dark-mode');
+        darkModeSwitch.classList.add('active');
+    }
+    
+    // Add click event listener
+    darkModeSwitch.addEventListener('click', () => {
+        body.classList.toggle('dark-mode');
+        darkModeSwitch.classList.toggle('active');
+        
+        // Save preference to localStorage
+        localStorage.setItem('darkMode', body.classList.contains('dark-mode'));
+    });
 }
 
 // Toggle profile modal visibility

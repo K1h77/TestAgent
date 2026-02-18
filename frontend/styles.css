@@ -69,6 +69,53 @@ body {
     margin: 0;
 }
 
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.dark-mode-switch {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    cursor: pointer;
+    border: none;
+    padding: 0;
+    transition: transform 0.2s;
+    position: relative;
+}
+
+.dark-mode-switch:hover {
+    transform: scale(1.1);
+}
+
+.dark-mode-switch.active {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.light-mode-icon {
+    display: none;
+}
+
+.dark-mode-icon {
+    display: block;
+}
+
+.dark-mode-switch.active .light-mode-icon {
+    display: block;
+}
+
+.dark-mode-switch.active .dark-mode-icon {
+    display: none;
+}
+
 .user-icon {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
@@ -298,4 +345,87 @@ button:active {
 
 .profile-field span {
     color: #333;
+}
+
+/* Dark Mode Styles */
+body.dark-mode {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+}
+
+body.dark-mode .container {
+    background: #0f3460;
+    color: #e6e6e6;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-mode .login-form {
+    background: #0f3460;
+    color: #e6e6e6;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-mode .add-task-section {
+    background: #1a1a2e;
+}
+
+body.dark-mode h1,
+body.dark-mode h2 {
+    color: #e6e6e6;
+}
+
+body.dark-mode .text-input,
+body.dark-mode #taskTitle,
+body.dark-mode #taskDescription {
+    background: #1a1a2e;
+    color: #e6e6e6;
+    border-color: #4a5568;
+}
+
+body.dark-mode .task {
+    background: #1a1a2e;
+    border-color: #4a5568;
+    color: #e6e6e6;
+}
+
+body.dark-mode .task-title {
+    color: #e6e6e6;
+}
+
+body.dark-mode .task-description {
+    color: #a0aec0;
+}
+
+body.dark-mode .task.completed {
+    background: #16213e;
+    opacity: 0.8;
+}
+
+body.dark-mode .task.completed .task-title {
+    color: #a0aec0;
+}
+
+body.dark-mode .profile-content {
+    background: #0f3460;
+    color: #e6e6e6;
+}
+
+body.dark-mode .close-btn {
+    background: #4a5568;
+    color: #e6e6e6;
+}
+
+body.dark-mode .close-btn:hover {
+    background: #5a6578;
+}
+
+body.dark-mode .profile-field {
+    border-bottom-color: #4a5568;
+}
+
+body.dark-mode .profile-field label {
+    color: #a0aec0;
+}
+
+body.dark-mode .profile-field span {
+    color: #e6e6e6;
 }
