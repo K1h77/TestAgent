@@ -64,7 +64,7 @@ async function addTask() {
     const description = descriptionInput.value.trim();
     
     if (!title) {
-        alert('Please enter a task title');
+        showErrorAlert('Please enter a task title');
         return;
     }
     
@@ -81,12 +81,13 @@ async function addTask() {
             titleInput.value = '';
             descriptionInput.value = '';
             loadTasks();
+            showSuccessAlert('Task added successfully!');
         } else {
-            alert('Failed to add task');
+            showErrorAlert('Failed to add task');
         }
     } catch (error) {
         console.error('Error adding task:', error);
-        alert('Failed to add task. Make sure the backend server is running.');
+        showErrorAlert('Failed to add task. Make sure the backend server is running.');
     }
 }
 
@@ -150,3 +151,47 @@ function toggleProfile() {
         profileModal.style.display = 'none';
     }
 }
+
+// Alert Component Functions
+function showAlert(message, type = 'info') {
+    const alertContainer = document.getElementById('alertContainer');
+    
+    // Create alert element
+    const alert = document.createElement('div');
+    alert.className = `alert ${type}`;
+    alert.innerHTML = `
+        <div class="alert-content">${escapeHtml(message)}</div>
+        <button class="alert-close" onclick="this.parentElement.remove()">✕</button>
+    `;
+    
+    // Add to container
+    alertContainer.appendChild(alert);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (alert.parentElement) {
+            alert.remove();
+        }
+    }, 5000);
+}
+
+// Show success alert helper
+function showSuccessAlert(message) {
+    showAlert(message, 'success');
+}
+
+// Show error alert helper
+function showErrorAlert(message) {
+    showAlert(message, 'error');
+}
+
+// Show info alert helper
+function showInfoAlert(message) {
+    showAlert(message, 'info');
+}
+
+// Make functions globally available
+window.showAlert = showAlert;
+window.showSuccessAlert = showSuccessAlert;
+window.showErrorAlert = showErrorAlert;
+window.showInfoAlert = showInfoAlert;

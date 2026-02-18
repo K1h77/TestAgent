@@ -1,0 +1,24 @@
+- generic [ref=e10]:
+  - generic [ref=e11]:
+    - heading "📝 Task Manager" [level=1] [ref=e12]
+    - button "👤" [ref=e13] [cursor=pointer]:
+      - generic [ref=e14]: 👤
+  - generic [ref=e15]:
+    - heading "Add New Task" [level=2] [ref=e16]
+    - textbox "Task title" [ref=e17]
+    - textbox "Task description (optional)" [ref=e18]
+    - button "Add Task" [active] [ref=e19] [cursor=pointer]
+  - generic [ref=e20]:
+    - heading "Tasks" [level=2] [ref=e21]
+    - generic [ref=e22]:
+      - generic [ref=e34]:
+        - generic [ref=e36]: Sample Task
+        - generic [ref=e37]: This is a sample task
+        - generic [ref=e38]:
+          - button "Complete" [ref=e39] [cursor=pointer]
+          - button "Delete" [ref=e40] [cursor=pointer]
+      - generic [ref=e41]:
+        - generic [ref=e43]: Test Task
+        - generic [ref=e44]:
+          - button "Complete" [ref=e45] [cursor=pointer]
+          - button "Delete" [ref=e46] [cursor=pointer]
