@@ -265,14 +265,14 @@ class ClineRunner:
 
         if not cline_result.success:
             logger.error(
-                f"Cline failed with exit code {result.returncode}. "
-                f"stderr: {result.stderr[:500]}"
+                f"Cline failed with exit code {returncode}. "
+                f"stderr: {result_stderr[:500]}"
             )
             raise ClineError(
-                f"Cline exited with code {result.returncode}",
-                stdout=result.stdout,
-                stderr=result.stderr,
-                exit_code=result.returncode,
+                f"Cline exited with code {returncode}",
+                stdout=result_stdout,
+                stderr=result_stderr,
+                exit_code=returncode,
             )
 
         return cline_result
