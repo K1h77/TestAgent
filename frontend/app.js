@@ -5,6 +5,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('loginForm');
     const loginContainer = document.getElementById('loginContainer');
     const mainContainer = document.getElementById('mainContainer');
+    const darkModeToggle = document.getElementById('darkModeToggle');
+    
+    // Initialize dark mode from localStorage
+    const isDarkMode = localStorage.getItem('darkMode') === 'true';
+    if (isDarkMode) {
+        document.body.classList.add('dark-mode');
+        darkModeToggle.checked = true;
+    }
+    
+    // Set up dark mode toggle event listener
+    darkModeToggle.addEventListener('change', () => {
+        if (darkModeToggle.checked) {
+            document.body.classList.add('dark-mode');
+            localStorage.setItem('darkMode', 'true');
+        } else {
+            document.body.classList.remove('dark-mode');
+            localStorage.setItem('darkMode', 'false');
+        }
+    });
     
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
