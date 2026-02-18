@@ -239,7 +239,7 @@ def main() -> None:
             fixer = ClineRunner(
                 cline_dir=REPO_ROOT / f".cline-fixer-{iteration}",
                 model=_cfg.models.fixer,
-                mcp_settings_path=MCP_SETTINGS_PATH,
+                # No MCP settings — fixer uses CLI tools only, same as coding_cline.
             )
 
             fix_prompt = load_template(

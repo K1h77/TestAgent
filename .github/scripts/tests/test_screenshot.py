@@ -114,28 +114,48 @@ class TestEmbedScreenshotsMarkdown:
 
     def test_both_screenshots(self, tmp_path):
         before = tmp_path / "screenshots" / "before.png"
-        after = tmp_path / "screenshots" / "after.png"
+        after1 = tmp_path / "screenshots" / "after_01.png"
+        after2 = tmp_path / "screenshots" / "after_02.png"
 
-        md = embed_screenshots_markdown(before, after, "ralph/issue-1", "user/repo")
+        md = embed_screenshots_markdown(before, [after1, after2], "ralph/issue-1", "user/repo")
 
         assert "Before" in md
         assert "After" in md
         assert "raw.githubusercontent.com" in md
         assert "ralph/issue-1" in md
+        assert "after_01.png" in md
+        assert "after_02.png" in md
+
+    def test_multiple_after_labels(self, tmp_path):
+        after1 = tmp_path / "screenshots" / "after_01.png"
+        after2 = tmp_path / "screenshots" / "after_02.png"
+
+        md = embed_screenshots_markdown(None, [after1, after2], "branch", "user/repo")
+
+        assert "After 1" in md
+        assert "After 2" in md
+
+    def test_single_after_no_number_label(self, tmp_path):
+        after = tmp_path / "screenshots" / "after_01.png"
+
+        md = embed_screenshots_markdown(None, [after], "branch", "user/repo")
+
+        assert "![After]" in md
+        assert "After 1" not in md
 
     def test_no_screenshots(self):
-        md = embed_screenshots_markdown(None, None, "branch", "user/repo")
+        md = embed_screenshots_markdown(None, [], "branch", "user/repo")
         assert "No screenshots" in md
 
     def test_only_before(self, tmp_path):
         before = tmp_path / "screenshots" / "before.png"
-        md = embed_screenshots_markdown(before, None, "branch", "user/repo")
+        md = embed_screenshots_markdown(before, [], "branch", "user/repo")
         assert "Before" in md
         assert "After" not in md
 
     def test_only_after(self, tmp_path):
-        after = tmp_path / "screenshots" / "after.png"
-        md = embed_screenshots_markdown(None, after, "branch", "user/repo")
+        after = tmp_path / "screenshots" / "after_01.png"
+        md = embed_screenshots_markdown(None, [after], "branch", "user/repo")
         assert "After" in md
         assert "Before" not in md
 

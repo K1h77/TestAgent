@@ -56,13 +56,6 @@ npx playwright test
 ```
 All tests must pass.
 
-### Step 6: Visual Verification (UI changes only)
-If this issue involves any UI changes:
-1. Use the Playwright MCP server to navigate to http://localhost:3000
-2. If there's a login form, enter any credentials and submit
-3. Take a screenshot to verify the UI looks correct
-4. Save to `{{SCREENSHOTS_DIR}}/after.png`
-
 ## Rules
 - NEVER skip writing tests first
 - NEVER modify test expectations just to make them pass — fix the implementation instead

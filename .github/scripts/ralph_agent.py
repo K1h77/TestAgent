@@ -228,7 +228,8 @@ def main() -> None:
         cline_dir=REPO_ROOT / ".cline-agent",
         model=_cfg.models.coding,
         plan_model=_cfg.models.coding_plan,
-        mcp_settings_path=MCP_SETTINGS_PATH,
+        # No MCP settings — coding agent uses CLI tools only (npm, git, etc.).
+        # Playwright MCP is only for vision_cline (Qwen VL) which can handle image inputs.
     )
     vision_cline = ClineRunner(
         cline_dir=REPO_ROOT / ".cline-vision",
@@ -241,7 +242,7 @@ def main() -> None:
 
     # Initialize screenshot paths before try so they're always defined
     before_path = None
-    after_path = None
+    after_paths: list = []
 
     try:
         # ── 7. Before screenshot ────────────────────────────────
@@ -314,12 +315,12 @@ def main() -> None:
                 )
 
         # ── 10. After screenshot + inline visual review ────────
-        logger.info("Taking 'after' screenshot with visual review...")
+        logger.info("Taking 'after' screenshots with visual review...")
         stop_server(server)
         time.sleep(2)
         server = start_server()
 
-        after_path, _ = take_after_screenshot_with_review(
+        after_paths, _ = take_after_screenshot_with_review(
             vision_cline,
             SCREENSHOTS_DIR / "after.png",
             issue_number=issue.number,
@@ -358,7 +359,7 @@ def main() -> None:
 
     screenshots_md = embed_screenshots_markdown(
         before_path=before_path,
-        after_path=after_path,
+        after_paths=after_paths,
         branch=branch,
         repo=repo_name,
     )
