@@ -5,7 +5,7 @@ immediately rather than allowing the agent to proceed with bad input.
 """
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -15,6 +15,11 @@ class Issue:
     number: int
     title: str
     body: str
+    labels: frozenset = field(default_factory=frozenset)
+
+    def is_frontend(self) -> bool:
+        """Return True if the issue is tagged with the 'frontend' label."""
+        return "frontend" in self.labels
 
 
 def require_env(name: str) -> str:
@@ -38,13 +43,14 @@ def require_env(name: str) -> str:
     return value.strip()
 
 
-def parse_issue(number: str, title: str, body: str) -> Issue:
+def parse_issue(number: str, title: str, body: str, labels: str = "") -> Issue:
     """Parse and validate issue fields.
 
     Args:
         number: Issue number as string (from env var).
         title: Issue title.
         body: Issue body/description.
+        labels: Comma-separated list of label names (optional).
 
     Returns:
         Validated Issue dataclass.
@@ -82,8 +88,14 @@ def parse_issue(number: str, title: str, body: str) -> Issue:
             "description of the problem."
         )
 
+    # Parse labels (comma-separated, stripped, lowercased, empty-filtered)
+    parsed_labels: frozenset = frozenset(
+        lbl.strip().lower() for lbl in labels.split(",") if lbl.strip()
+    )
+
     return Issue(
         number=issue_number,
         title=title.strip(),
         body=body.strip(),
+        labels=parsed_labels,
     )

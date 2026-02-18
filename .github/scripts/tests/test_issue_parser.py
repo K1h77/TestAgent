@@ -73,6 +73,72 @@ class TestParseIssue:
             issue.number = 2
 
 
+class TestIssueLabels:
+    """Tests for labels field and is_frontend() on Issue."""
+
+    def test_labels_default_empty(self):
+        issue = parse_issue("1", "Title", "Body")
+        assert issue.labels == frozenset()
+
+    def test_labels_single(self):
+        issue = parse_issue("1", "Title", "Body", labels="frontend")
+        assert issue.labels == frozenset({"frontend"})
+
+    def test_labels_multiple(self):
+        issue = parse_issue("1", "Title", "Body", labels="frontend,bug,help wanted")
+        assert issue.labels == frozenset({"frontend", "bug", "help wanted"})
+
+    def test_labels_stripped_and_lowercased(self):
+        issue = parse_issue("1", "Title", "Body", labels="  Frontend  ,  BUG  ")
+        assert "frontend" in issue.labels
+        assert "bug" in issue.labels
+
+    def test_labels_empty_string(self):
+        issue = parse_issue("1", "Title", "Body", labels="")
+        assert issue.labels == frozenset()
+
+    def test_labels_whitespace_only_string(self):
+        issue = parse_issue("1", "Title", "Body", labels="   ,  ,  ")
+        assert issue.labels == frozenset()
+
+    def test_is_frontend_true(self):
+        issue = parse_issue("1", "Title", "Body", labels="frontend")
+        assert issue.is_frontend() is True
+
+    def test_is_frontend_true_case_insensitive_input(self):
+        issue = parse_issue("1", "Title", "Body", labels="Frontend")
+        assert issue.is_frontend() is True
+
+    def test_is_frontend_false_no_labels(self):
+        issue = parse_issue("1", "Title", "Body")
+        assert issue.is_frontend() is False
+
+    def test_is_frontend_false_other_labels(self):
+        issue = parse_issue("1", "Title", "Body", labels="bug,backend,performance")
+        assert issue.is_frontend() is False
+
+    def test_is_frontend_true_among_many_labels(self):
+        issue = parse_issue("1", "Title", "Body", labels="bug,frontend,help wanted")
+        assert issue.is_frontend() is True
+
+    def test_valid_input_includes_labels(self):
+        issue = parse_issue("42", "Fix UI bug", "Button is broken", labels="frontend,bug")
+        assert issue.number == 42
+        assert issue.title == "Fix UI bug"
+        assert issue.body == "Button is broken"
+        assert "frontend" in issue.labels
+        assert "bug" in issue.labels
+
+    def test_labels_field_is_frozenset(self):
+        issue = parse_issue("1", "Title", "Body", labels="frontend")
+        assert isinstance(issue.labels, frozenset)
+
+    def test_labels_immutable_via_frozen_dataclass(self):
+        issue = parse_issue("1", "Title", "Body", labels="frontend")
+        with pytest.raises(AttributeError):
+            issue.labels = frozenset({"other"})
+
+
 class TestRequireEnv:
     """Tests for require_env()."""
 

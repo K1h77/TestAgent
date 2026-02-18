@@ -105,10 +105,10 @@ class TestClineRunnerInit:
 
         ClineRunner(cline_dir=cline_dir, model="model-v1")
         state_path = cline_dir / "data" / "globalState.json"
-        assert json.loads(state_path.read_text())["actModeApiModelId"] == "model-v1"
+        assert json.loads(state_path.read_text())["actModeOpenRouterModelId"] == "model-v1"
 
         ClineRunner(cline_dir=cline_dir, model="model-v2")
-        assert json.loads(state_path.read_text())["actModeApiModelId"] == "model-v2"
+        assert json.loads(state_path.read_text())["actModeOpenRouterModelId"] == "model-v2"
 
     @patch("shutil.which", return_value="/usr/bin/cline")
     def test_default_permissions(self, mock_which, tmp_path):
@@ -159,8 +159,7 @@ class TestClineRunnerRun:
         cmd = call_args[0][0]
         assert cmd[0] == "cline"
         assert "-y" in cmd
-        assert "--model" in cmd
-        assert "minimax/minimax-m2.5" in cmd
+        assert "--model" not in cmd  # model is set via globalState.json, not CLI flag
         assert "--timeout" in cmd
 
     @patch("time.sleep")

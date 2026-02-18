@@ -166,14 +166,20 @@ class ClineRunner:
 
         # Write auth config so Cline doesn't prompt interactively.
         # Always overwrite so model changes and key rotations take effect.
+        #
+        # For OpenRouter, Cline uses provider-specific model ID keys:
+        #   actModeOpenRouterModelId / planModeOpenRouterModelId
+        # NOT the generic actModeApiModelId / planModeApiModelId (those are for
+        # single-provider setups like Anthropic direct). Using the wrong keys
+        # causes Cline to find no model config and fall back to its default (Claude Sonnet).
         global_state = data_dir / "globalState.json"
         api_key = os.environ.get("OPENROUTER_API_KEY", "")
         state = {
             "welcomeViewCompleted": True,
             "actModeApiProvider": "openrouter",
-            "actModeApiModelId": self.model,
+            "actModeOpenRouterModelId": self.model,
             "planModeApiProvider": "openrouter",
-            "planModeApiModelId": self.plan_model,
+            "planModeOpenRouterModelId": self.plan_model,
         }
         global_state.write_text(json.dumps(state, indent=2), encoding="utf-8")
         logger.debug(f"Wrote globalState.json to {global_state}")
@@ -211,7 +217,6 @@ class ClineRunner:
         cmd = [
             "cline",
             "-y",
-            "--model", self.model,
             "--timeout", str(timeout),
         ]
 

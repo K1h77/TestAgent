@@ -202,11 +202,14 @@ def main() -> None:
         number=require_env("ISSUE_NUMBER"),
         title=require_env("ISSUE_TITLE"),
         body=require_env("ISSUE_BODY"),
+        labels=os.environ.get("ISSUE_LABELS", ""),
     )
     require_env("OPENROUTER_API_KEY")
 
     logger.info(f"Issue #{issue.number}: {issue.title}")
     logger.info(f"Issue body: {issue.body[:200]}...")
+    logger.info(f"Issue labels: {sorted(issue.labels) or '(none)'}")
+    logger.info(f"Frontend checks enabled: {issue.is_frontend()}")
 
     # ── 2. Configure git ────────────────────────────────────────
     configure_git_user()
@@ -238,25 +241,28 @@ def main() -> None:
         cline_dir=REPO_ROOT / ".cline-vision",
         model=_cfg.models.vision,
         mcp_settings_path=MCP_SETTINGS_PATH,
-    )
+    ) if issue.is_frontend() else None
 
-    # ── 6. Start backend server ─────────────────────────────────
-    server = start_server()
+    # ── 6. Start backend server (frontend issues only) ──────────
+    server = start_server() if issue.is_frontend() else None
+    if not issue.is_frontend():
+        logger.info("Skipping server start and screenshots (not a frontend issue)")
 
     # Initialize screenshot paths before try so they're always defined
     before_path = None
     after_paths: list = []
 
     try:
-        # ── 7. Before screenshot ────────────────────────────────
-        before_path = take_screenshot(
-            vision_cline,
-            SCREENSHOTS_DIR / "before.png",
-            issue_number=issue.number,
-            issue_title=issue.title,
-            issue_body=issue.body,
-            timeout=_cfg.timeouts.screenshot_seconds,
-        )
+        # ── 7. Before screenshot (frontend issues only) ─────────
+        if issue.is_frontend() and vision_cline is not None and server is not None:
+            before_path = take_screenshot(
+                vision_cline,
+                SCREENSHOTS_DIR / "before.png",
+                issue_number=issue.number,
+                issue_title=issue.title,
+                issue_body=issue.body,
+                timeout=_cfg.timeouts.screenshot_seconds,
+            )
 
         # ── 8. Coding loop (TDD + retry with progress check) ─────
         logger.info("=" * 40)
@@ -316,23 +322,25 @@ def main() -> None:
                     f"Tests still failing after {coding_attempts} attempts. Proceeding with PR."
                 )
 
-        # ── 10. After screenshot + inline visual review ────────
-        logger.info("Taking 'after' screenshots with visual review...")
-        stop_server(server)
-        time.sleep(2)
-        server = start_server()
+        # ── 10. After screenshot + inline visual review (frontend only) ──
+        if issue.is_frontend() and vision_cline is not None and server is not None:
+            logger.info("Taking 'after' screenshots with visual review...")
+            stop_server(server)
+            time.sleep(2)
+            server = start_server()
 
-        after_paths, _ = take_after_screenshot_with_review(
-            vision_cline,
-            SCREENSHOTS_DIR / "after.png",
-            issue_number=issue.number,
-            issue_title=issue.title,
-            issue_body=issue.body,
-            timeout=_cfg.timeouts.screenshot_seconds,
-        )
+            after_paths, _ = take_after_screenshot_with_review(
+                vision_cline,
+                SCREENSHOTS_DIR / "after.png",
+                issue_number=issue.number,
+                issue_title=issue.title,
+                issue_body=issue.body,
+                timeout=_cfg.timeouts.screenshot_seconds,
+            )
 
     finally:
-        stop_server(server)
+        if server is not None:
+            stop_server(server)
 
     # ── 11. Commit and push ─────────────────────────────────────
     logger.info("=" * 40)

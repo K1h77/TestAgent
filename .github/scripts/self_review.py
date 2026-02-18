@@ -191,6 +191,7 @@ def main() -> None:
         number=require_env("ISSUE_NUMBER"),
         title=require_env("ISSUE_TITLE"),
         body=require_env("ISSUE_BODY"),
+        labels=os.environ.get("ISSUE_LABELS", ""),
     )
     pr_number = require_env("PR_NUMBER")
     branch = require_env("BRANCH")
@@ -243,7 +244,8 @@ def main() -> None:
         )
 
         # Prepend any visual QA findings from the after-screenshot review
-        visual_verdict = read_visual_verdict(SCREENSHOTS_DIR)
+        # (only relevant for frontend issues that actually took screenshots)
+        visual_verdict = read_visual_verdict(SCREENSHOTS_DIR) if issue.is_frontend() else None
         if visual_verdict:
             logger.info(f"Injecting visual verdict into review prompt: {visual_verdict.splitlines()[0]}")
             review_prompt = (
@@ -261,7 +263,7 @@ def main() -> None:
             last_review_output = result.stdout
         except ClineError as e:
             logger.error(f"Reviewer Cline crashed: {e}. Treating as LGTM (benefit of the doubt).")
-            visual_verdict = read_visual_verdict(SCREENSHOTS_DIR)
+            visual_verdict = read_visual_verdict(SCREENSHOTS_DIR) if issue.is_frontend() else None
             visual_section = f"\n\n### Visual QA\n{visual_verdict}" if visual_verdict else ""
             _safe_label_pr(pr_number, "review-passed")
             _safe_post_pr_comment(pr_number, format_review_summary(
@@ -276,7 +278,7 @@ def main() -> None:
 
         if verdict == "LGTM":
             logger.info("Review passed!")
-            visual_verdict = read_visual_verdict(SCREENSHOTS_DIR)
+            visual_verdict = read_visual_verdict(SCREENSHOTS_DIR) if issue.is_frontend() else None
             visual_section = f"\n\n### Visual QA\n{visual_verdict}" if visual_verdict else ""
             _safe_label_pr(pr_number, "review-passed")
             _safe_post_pr_comment(pr_number, format_review_summary(
@@ -325,7 +327,7 @@ def main() -> None:
 
     # ── 3. Exhausted iterations ─────────────────────────────────
     logger.warning("Max review iterations reached. Posting final review.")
-    visual_verdict = read_visual_verdict(SCREENSHOTS_DIR)
+    visual_verdict = read_visual_verdict(SCREENSHOTS_DIR) if issue.is_frontend() else None
     visual_section = f"\n\n### Visual QA\n{visual_verdict}" if visual_verdict else ""
     _safe_label_pr(pr_number, "review-needs-attention")
     _safe_post_pr_comment(pr_number, format_review_summary(

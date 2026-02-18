@@ -12,6 +12,10 @@ on:
       issue_body:
         description: "Issue body"
         required: true
+      issue_labels:
+        description: "Comma-separated labels on the issue (e.g. 'frontend,bug')"
+        required: false
+        default: ""
 
 # Only one run per issue at a time.
 concurrency:
@@ -32,6 +36,7 @@ jobs:
       ISSUE_NUMBER: ${{ inputs.issue_number }}
       ISSUE_TITLE: ${{ inputs.issue_title }}
       ISSUE_BODY: ${{ inputs.issue_body }}
+      ISSUE_LABELS: ${{ inputs.issue_labels }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -131,6 +136,7 @@ jobs:
         env:
           PR_NUMBER: ${{ steps.agent.outputs.pr_number }}
           BRANCH: ${{ steps.agent.outputs.branch }}
+          ISSUE_LABELS: ${{ inputs.issue_labels }}
 
       # ── Failure Handling ──────────────────────────────────────
       - name: Post failure comment on issue
