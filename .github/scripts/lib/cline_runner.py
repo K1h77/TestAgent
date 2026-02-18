@@ -234,13 +234,12 @@ class ClineRunner:
             for raw in stream:
                 line = raw.rstrip("\n")
                 lines.append(line)
-                # Stderr carries Cline's live status messages (task start, errors, tool use).
-                # Log at INFO so they're visible in CI without verbose mode.
-                # Stdout is the final summary blob — keep at DEBUG.
-                if label == "stderr" and line.strip():
-                    logger.info(f"[cline] {line}")
-                else:
-                    logger.debug(f"[cline {label}] {line}")
+                # Both stdout and stderr carry live Cline activity:
+                # - stderr: task lifecycle events (Task started, tool calls, errors)
+                # - stdout: tool results, file edits, command output
+                # Log both at INFO so the full agent activity is visible in CI logs.
+                if line.strip():
+                    logger.info(f"[cline {label}] {line}")
                 # Check for patterns that indicate Cline is stuck
                 for pattern in _STUCK_PATTERNS:
                     if pattern.lower() in line.lower():
