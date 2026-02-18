@@ -6,7 +6,7 @@ models:
   # Cline model used for the main TDD coding loop
   coding: "deepseek/deepseek-v3.2"
   # Plan-mode model for the coding Cline instance (used for planning before acting)
-  coding_plan: "anthropic/claude-haiku-4.5"
+  coding_plan: "minimax/minimax-m2.5"
   # Multimodal model used for before/after screenshots and visual QA
   vision: "qwen/qwen3-vl-30b-a3b-instruct"
   # Model used by the self-review Cline instance (read-only reviewer)

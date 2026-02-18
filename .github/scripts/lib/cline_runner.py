@@ -220,6 +220,13 @@ class ClineRunner:
             "--timeout", str(timeout),
         ]
 
+        # Start in plan mode when a distinct plan model is configured.
+        # In YOLO mode, Cline auto-switches plan→act after the plan is presented,
+        # so both models are used: plan_model for planning, model for execution.
+        # When plan_model == model (no separate planner), skip plan mode entirely.
+        if self.plan_model != self.model:
+            cmd.append("-p")
+
         if cwd:
             cmd.extend(["-c", str(cwd)])
 

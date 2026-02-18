@@ -161,6 +161,7 @@ class TestClineRunnerRun:
         assert "-y" in cmd
         assert "--model" not in cmd  # model is set via globalState.json, not CLI flag
         assert "--timeout" in cmd
+        assert "-p" not in cmd  # no separate plan_model, so act mode only
 
     @patch("time.sleep")
     @patch("shutil.which", return_value="/usr/bin/cline")
@@ -210,6 +211,49 @@ class TestClineRunnerRun:
         env = call_args[1]["env"]
         assert env["CLINE_DIR"] == str(cline_dir)
         assert "CLINE_COMMAND_PERMISSIONS" in env
+
+
+    @patch("time.sleep")
+    @patch("shutil.which", return_value="/usr/bin/cline")
+    @patch("subprocess.Popen")
+    def test_plan_flag_added_when_separate_plan_model(self, mock_popen, mock_which, mock_sleep, tmp_path):
+        """When plan_model differs from model, -p flag must be passed so the planner is used."""
+        mock_proc = MagicMock()
+        mock_proc.poll.side_effect = [None, 0]
+        mock_proc.returncode = 0
+        mock_proc.stdout = iter(["done\n"])
+        mock_proc.stderr = iter([])
+        mock_proc.wait.return_value = 0
+        mock_popen.return_value = mock_proc
+
+        runner = ClineRunner(
+            cline_dir=tmp_path / "c",
+            model="deepseek/deepseek-v3",
+            plan_model="anthropic/claude-haiku-4.5",
+        )
+        runner.run("Build the feature")
+
+        cmd = mock_popen.call_args[0][0]
+        assert "-p" in cmd  # plan mode must be enabled so haiku is used for planning
+
+    @patch("time.sleep")
+    @patch("shutil.which", return_value="/usr/bin/cline")
+    @patch("subprocess.Popen")
+    def test_plan_flag_absent_when_no_separate_plan_model(self, mock_popen, mock_which, mock_sleep, tmp_path):
+        """When plan_model is not set (defaults to model), -p flag must NOT be added."""
+        mock_proc = MagicMock()
+        mock_proc.poll.side_effect = [None, 0]
+        mock_proc.returncode = 0
+        mock_proc.stdout = iter(["done\n"])
+        mock_proc.stderr = iter([])
+        mock_proc.wait.return_value = 0
+        mock_popen.return_value = mock_proc
+
+        runner = ClineRunner(cline_dir=tmp_path / "c", model="minimax/minimax-m2.5")
+        runner.run("Review the code")
+
+        cmd = mock_popen.call_args[0][0]
+        assert "-p" not in cmd
 
 
 class TestPermissionConstants:
