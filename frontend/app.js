@@ -27,7 +27,11 @@ async function loadTasks() {
         displayTasks(tasks);
     } catch (error) {
         console.error('Error loading tasks:', error);
-        alert('Failed to load tasks. Make sure the backend server is running on port 3000.');
+        if (window.showAlert) {
+            window.showAlert('Failed to load tasks. Make sure the backend server is running on port 3000.', 'error');
+        } else {
+            alert('Failed to load tasks. Make sure the backend server is running on port 3000.');
+        }
     }
 }
 
@@ -64,7 +68,11 @@ async function addTask() {
     const description = descriptionInput.value.trim();
     
     if (!title) {
-        alert('Please enter a task title');
+        if (window.showAlert) {
+            window.showAlert('Please enter a task title', 'info');
+        } else {
+            alert('Please enter a task title');
+        }
         return;
     }
     
@@ -80,13 +88,24 @@ async function addTask() {
         if (response.ok) {
             titleInput.value = '';
             descriptionInput.value = '';
+            if (window.showAlert) {
+                window.showAlert('Task added successfully!', 'success');
+            }
             loadTasks();
         } else {
-            alert('Failed to add task');
+            if (window.showAlert) {
+                window.showAlert('Failed to add task', 'error');
+            } else {
+                alert('Failed to add task');
+            }
         }
     } catch (error) {
         console.error('Error adding task:', error);
-        alert('Failed to add task. Make sure the backend server is running.');
+        if (window.showAlert) {
+            window.showAlert('Failed to add task. Make sure the backend server is running.', 'error');
+        } else {
+            alert('Failed to add task. Make sure the backend server is running.');
+        }
     }
 }
 
@@ -102,13 +121,24 @@ async function toggleTask(id, completed) {
         });
         
         if (response.ok) {
+            if (window.showAlert) {
+                window.showAlert(`Task marked as ${completed ? 'completed' : 'pending'}`, 'success');
+            }
             loadTasks();
         } else {
-            alert('Failed to update task');
+            if (window.showAlert) {
+                window.showAlert('Failed to update task', 'error');
+            } else {
+                alert('Failed to update task');
+            }
         }
     } catch (error) {
         console.error('Error updating task:', error);
-        alert('Failed to update task. Make sure the backend server is running.');
+        if (window.showAlert) {
+            window.showAlert('Failed to update task. Make sure the backend server is running.', 'error');
+        } else {
+            alert('Failed to update task. Make sure the backend server is running.');
+        }
     }
 }
 
