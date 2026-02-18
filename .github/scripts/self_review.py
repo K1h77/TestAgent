@@ -159,7 +159,7 @@ def main() -> None:
         # Fresh reviewer context each time
         reviewer = ClineRunner(
             cline_dir=REPO_ROOT / f".cline-reviewer-{iteration}",
-            model="google/gemini-2.5-flash-preview",
+            model="google/gemini-3-flash-preview",
             command_permissions=READ_ONLY_PERMISSIONS,
         )
 

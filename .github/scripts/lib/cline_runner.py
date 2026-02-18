@@ -274,8 +274,9 @@ class ClineRunner:
             t_out.start()
             t_err.start()
 
-            # Snapshot OpenRouter usage baseline for idle detection
+            # Snapshot OpenRouter usage baseline for idle detection and per-run spend tracking
             last_usage = _get_openrouter_usage()
+            run_baseline = last_usage  # account total at process start
 
             # Wait for process, checking for stuck/idle/timeout
             deadline = _time.monotonic() + timeout + 30
@@ -330,7 +331,9 @@ class ClineRunner:
                         elapsed = int(now - (deadline - timeout - 30))
                         if current_usage is not None and last_usage is not None:
                             delta = current_usage - last_usage
-                            usage_str = f" | spent +${delta:.4f} (total ${current_usage:.4f})"
+                            run_total = current_usage - run_baseline if run_baseline is not None else None
+                            run_str = f" / ${run_total:.4f} this run" if run_total is not None else ""
+                            usage_str = f" | +${delta:.4f} this interval{run_str}"
                         elif current_usage is not None:
                             usage_str = f" | usage=${current_usage:.4f}"
                         else:
