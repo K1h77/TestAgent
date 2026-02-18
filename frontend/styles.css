@@ -89,6 +89,59 @@ body {
     transform: scale(1.1);
 }
 
+/* Header Controls */
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+/* Dark Mode Toggle Switch */
+.dark-mode-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 26px;
+}
+
+.dark-mode-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.switch-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: 0.4s;
+    border-radius: 26px;
+}
+
+.switch-slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.4s;
+    border-radius: 50%;
+}
+
+.dark-mode-switch input:checked + .switch-slider {
+    background-color: #667eea;
+}
+
+.dark-mode-switch input:checked + .switch-slider:before {
+    transform: translateX(24px);
+}
+
 
 h1 {
     text-align: center;
@@ -298,4 +351,99 @@ button:active {
 
 .profile-field span {
     color: #333;
+}
+
+/* Dark Mode Styles */
+body.dark-mode {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+}
+
+body.dark-mode .login-form {
+    background: #2d2d44;
+    color: #e0e0e0;
+}
+
+body.dark-mode .login-form h2 {
+    color: #b0b0b0;
+}
+
+body.dark-mode .text-input {
+    background: #3d3d5c;
+    border-color: #4d4d6d;
+    color: #e0e0e0;
+}
+
+body.dark-mode .container {
+    background: #2d2d44;
+    color: #e0e0e0;
+}
+
+body.dark-mode h1 {
+    color: #e0e0e0;
+}
+
+body.dark-mode h2 {
+    color: #b0b0b0;
+}
+
+body.dark-mode .add-task-section {
+    background: #252538;
+}
+
+body.dark-mode #taskTitle,
+body.dark-mode #taskDescription {
+    background: #3d3d5c;
+    border-color: #4d4d6d;
+    color: #e0e0e0;
+}
+
+body.dark-mode .task {
+    background: #3d3d5c;
+    border-color: #4d4d6d;
+}
+
+body.dark-mode .task-title {
+    color: #e0e0e0;
+}
+
+body.dark-mode .task-description {
+    color: #b0b0b0;
+}
+
+body.dark-mode .task.completed {
+    background: #252538;
+}
+
+body.dark-mode .task.completed .task-title {
+    color: #888;
+}
+
+body.dark-mode .profile-content {
+    background: #2d2d44;
+    color: #e0e0e0;
+}
+
+body.dark-mode .profile-content h2 {
+    color: #e0e0e0;
+}
+
+body.dark-mode .profile-field {
+    border-bottom-color: #4d4d6d;
+}
+
+body.dark-mode .profile-field label {
+    color: #b0b0b0;
+}
+
+body.dark-mode .profile-field span {
+    color: #e0e0e0;
+}
+
+body.dark-mode .close-btn {
+    background: #4d4d6d;
+    color: #e0e0e0;
+}
+
+body.dark-mode .close-btn:hover {
+    background: #5d5d7d;
 }

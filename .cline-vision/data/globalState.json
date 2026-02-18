@@ -1,0 +1,41 @@
+{
+  "welcomeViewCompleted": true,
+  "actModeApiProvider": "openrouter",
+  "actModeApiModelId": "qwen/qwen3-vl-30b-a3b-instruct",
+  "planModeApiProvider": "openrouter",
+  "planModeApiModelId": "qwen/qwen3-vl-30b-a3b-instruct",
+  "remoteRulesToggles": {},
+  "remoteWorkflowToggles": {},
+  "actModeOpenRouterModelId": "qwen/qwen3-vl-30b-a3b-instruct",
+  "actModeThinkingBudgetTokens": 0,
+  "planModeThinkingBudgetTokens": 0,
+  "yoloModeToggled": false,
+  "autoApprovalSettings": {
+    "version": 3,
+    "enabled": true,
+    "favorites": [],
+    "maxRequests": 20,
+    "actions": {
+      "readFiles": true,
+      "readFilesExternally": false,
+      "editFiles": false,
+      "editFilesExternally": false,
+      "executeSafeCommands": true,
+      "executeAllCommands": false,
+      "useBrowser": false,
+      "useMcp": true
+    },
+    "enableNotifications": false
+  },
+  "workspaceRoots": [
+    {
+      "path": "/home/runner/work/TestAgent/TestAgent",
+      "name": "TestAgent",
+      "vcs": "git",
+      "commitHash": "a4c921c8482b5c384dc1d11e852e10d66c320a48"
+    }
+  ],
+  "primaryRootIndex": 0,
+  "globalWorkflowToggles": {},
+  "globalClineRulesToggles": {}
+}

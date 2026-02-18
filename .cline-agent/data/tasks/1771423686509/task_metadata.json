@@ -1,0 +1,191 @@
+{
+  "files_in_context": [
+    {
+      "path": "frontend/index.html",
+      "record_state": "stale",
+      "record_source": "read_tool",
+      "cline_read_date": 1771423697710,
+      "cline_edit_date": null,
+      "user_edit_date": null
+    },
+    {
+      "path": "frontend/app.js",
+      "record_state": "stale",
+      "record_source": "read_tool",
+      "cline_read_date": 1771423697752,
+      "cline_edit_date": null,
+      "user_edit_date": null
+    },
+    {
+      "path": "frontend/styles.css",
+      "record_state": "stale",
+      "record_source": "read_tool",
+      "cline_read_date": 1771423697798,
+      "cline_edit_date": null,
+      "user_edit_date": null
+    },
+    {
+      "path": "package.json",
+      "record_state": "active",
+      "record_source": "read_tool",
+      "cline_read_date": 1771423717676,
+      "cline_edit_date": null,
+      "user_edit_date": null
+    },
+    {
+      "path": "playwright.config.js",
+      "record_state": "active",
+      "record_source": "read_tool",
+      "cline_read_date": 1771423720494,
+      "cline_edit_date": null,
+      "user_edit_date": null
+    },
+    {
+      "path": "/home/runner/work/TestAgent/TestAgent/frontend/index.html",
+      "record_state": "active",
+      "record_source": "cline_edited",
+      "cline_read_date": 1771423739927,
+      "cline_edit_date": 1771423739927,
+      "user_edit_date": null
+    },
+    {
+      "path": "frontend/index.html",
+      "record_state": "active",
+      "record_source": "user_edited",
+      "cline_read_date": 1771423697710,
+      "cline_edit_date": null,
+      "user_edit_date": 1771423740027
+    },
+    {
+      "path": "/home/runner/work/TestAgent/TestAgent/frontend/styles.css",
+      "record_state": "stale",
+      "record_source": "cline_edited",
+      "cline_read_date": 1771423758454,
+      "cline_edit_date": 1771423758454,
+      "user_edit_date": null
+    },
+    {
+      "path": "frontend/styles.css",
+      "record_state": "stale",
+      "record_source": "user_edited",
+      "cline_read_date": 1771423697798,
+      "cline_edit_date": null,
+      "user_edit_date": 1771423758569
+    },
+    {
+      "path": "/home/runner/work/TestAgent/TestAgent/frontend/styles.css",
+      "record_state": "active",
+      "record_source": "cline_edited",
+      "cline_read_date": 1771423772537,
+      "cline_edit_date": 1771423772537,
+      "user_edit_date": null
+    },
+    {
+      "path": "frontend/styles.css",
+      "record_state": "active",
+      "record_source": "user_edited",
+      "cline_read_date": 1771423697798,
+      "cline_edit_date": null,
+      "user_edit_date": 1771423772643
+    },
+    {
+      "path": "/home/runner/work/TestAgent/TestAgent/frontend/app.js",
+      "record_state": "stale",
+      "record_source": "cline_edited",
+      "cline_read_date": 1771423785176,
+      "cline_edit_date": 1771423785176,
+      "user_edit_date": null
+    },
+    {
+      "path": "frontend/app.js",
+      "record_state": "stale",
+      "record_source": "user_edited",
+      "cline_read_date": 1771423697752,
+      "cline_edit_date": null,
+      "user_edit_date": 1771423785276
+    },
+    {
+      "path": "/home/runner/work/TestAgent/TestAgent/frontend/app.js",
+      "record_state": "stale",
+      "record_source": "cline_edited",
+      "cline_read_date": 1771423804527,
+      "cline_edit_date": 1771423804527,
+      "user_edit_date": null
+    },
+    {
+      "path": "frontend/app.js",
+      "record_state": "stale",
+      "record_source": "user_edited",
+      "cline_read_date": 1771423697752,
+      "cline_edit_date": null,
+      "user_edit_date": 1771423804637
+    },
+    {
+      "path": "/home/runner/work/TestAgent/TestAgent/frontend/app.js",
+      "record_state": "stale",
+      "record_source": "cline_edited",
+      "cline_read_date": 1771423817350,
+      "cline_edit_date": 1771423817350,
+      "user_edit_date": null
+    },
+    {
+      "path": "frontend/app.js",
+      "record_state": "stale",
+      "record_source": "user_edited",
+      "cline_read_date": 1771423697752,
+      "cline_edit_date": null,
+      "user_edit_date": 1771423817469
+    },
+    {
+      "path": "/home/runner/work/TestAgent/TestAgent/frontend/app.js",
+      "record_state": "active",
+      "record_source": "cline_edited",
+      "cline_read_date": 1771423833488,
+      "cline_edit_date": 1771423833488,
+      "user_edit_date": null
+    },
+    {
+      "path": "frontend/app.js",
+      "record_state": "active",
+      "record_source": "user_edited",
+      "cline_read_date": 1771423697752,
+      "cline_edit_date": null,
+      "user_edit_date": 1771423833588
+    },
+    {
+      "path": "/home/runner/work/TestAgent/TestAgent/tests/e2e/dark-mode.test.js",
+      "record_state": "active",
+      "record_source": "cline_edited",
+      "cline_read_date": 1771423864982,
+      "cline_edit_date": 1771423864982,
+      "user_edit_date": null
+    },
+    {
+      "path": "backend/server.js",
+      "record_state": "active",
+      "record_source": "read_tool",
+      "cline_read_date": 1771423906371,
+      "cline_edit_date": null,
+      "user_edit_date": null
+    }
+  ],
+  "model_usage": [
+    {
+      "ts": 1771423686640,
+      "model_id": "minimax/minimax-m2.5",
+      "model_provider_id": "openrouter",
+      "mode": "act"
+    }
+  ],
+  "environment_history": [
+    {
+      "ts": 1771423686634,
+      "os_name": "linux",
+      "os_version": "6.14.0-1017-azure",
+      "os_arch": "x64",
+      "host_name": "Cline CLI - Node.js",
+      "host_version": "2.4.0",
+      "cline_version": "3.64.0"
+    }
+  ]
+}

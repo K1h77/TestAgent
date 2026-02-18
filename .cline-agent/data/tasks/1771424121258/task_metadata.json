@@ -1,0 +1,71 @@
+{
+  "files_in_context": [
+    {
+      "path": "frontend/app.js",
+      "record_state": "active",
+      "record_source": "read_tool",
+      "cline_read_date": 1771424131891,
+      "cline_edit_date": null,
+      "user_edit_date": null
+    },
+    {
+      "path": "frontend/index.html",
+      "record_state": "active",
+      "record_source": "read_tool",
+      "cline_read_date": 1771424147128,
+      "cline_edit_date": null,
+      "user_edit_date": null
+    },
+    {
+      "path": "tests/e2e/dark-mode.test.js",
+      "record_state": "active",
+      "record_source": "read_tool",
+      "cline_read_date": 1771424149801,
+      "cline_edit_date": null,
+      "user_edit_date": null
+    },
+    {
+      "path": "test-results/dark-mode-Dark-Mode-Featur-b4243-mode-when-switch-is-clicked/error-context.md",
+      "record_state": "active",
+      "record_source": "read_tool",
+      "cline_read_date": 1771424152193,
+      "cline_edit_date": null,
+      "user_edit_date": null
+    },
+    {
+      "path": "playwright.config.js",
+      "record_state": "active",
+      "record_source": "read_tool",
+      "cline_read_date": 1771424156022,
+      "cline_edit_date": null,
+      "user_edit_date": null
+    },
+    {
+      "path": "backend/server.js",
+      "record_state": "active",
+      "record_source": "read_tool",
+      "cline_read_date": 1771424159542,
+      "cline_edit_date": null,
+      "user_edit_date": null
+    }
+  ],
+  "model_usage": [
+    {
+      "ts": 1771424121368,
+      "model_id": "minimax/minimax-m2.5",
+      "model_provider_id": "openrouter",
+      "mode": "act"
+    }
+  ],
+  "environment_history": [
+    {
+      "ts": 1771424121364,
+      "os_name": "linux",
+      "os_version": "6.14.0-1017-azure",
+      "os_arch": "x64",
+      "host_name": "Cline CLI - Node.js",
+      "host_version": "2.4.0",
+      "cline_version": "3.64.0"
+    }
+  ]
+}

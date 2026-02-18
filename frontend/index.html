@@ -22,9 +22,15 @@
     <div class="container" id="mainContainer" style="display: none;">
         <div class="header">
             <h1>📝 Task Manager</h1>
-            <button class="user-icon" id="userIcon" onclick="toggleProfile()">
-                <span>👤</span>
-            </button>
+            <div class="header-controls">
+                <label class="dark-mode-switch">
+                    <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()">
+                    <span class="switch-slider"></span>
+                </label>
+                <button class="user-icon" id="userIcon" onclick="toggleProfile()">
+                    <span>👤</span>
+                </button>
+            </div>
         </div>
         
         <div class="add-task-section">

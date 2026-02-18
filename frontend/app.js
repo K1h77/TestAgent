@@ -17,6 +17,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // Show login form initially
     loginContainer.style.display = 'block';
     mainContainer.style.display = 'none';
+    
+    // Check for saved dark mode preference
+    const darkMode = localStorage.getItem('darkMode');
+    if (darkMode === 'enabled') {
+        document.body.classList.add('dark-mode');
+        document.getElementById('darkModeToggle').checked = true;
+    }
 });
 
 // Load all tasks from the API
@@ -150,3 +157,16 @@ function toggleProfile() {
         profileModal.style.display = 'none';
     }
 }
+
+// Toggle dark mode
+function toggleDarkMode() {
+    const darkModeToggle = document.getElementById('darkModeToggle');
+    if (darkModeToggle.checked) {
+        document.body.classList.add('dark-mode');
+        localStorage.setItem('darkMode', 'enabled');
+    } else {
+        document.body.classList.remove('dark-mode');
+        localStorage.setItem('darkMode', 'disabled');
+    }
+}
+
