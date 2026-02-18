@@ -20,9 +20,6 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# If no activity (stdout, stderr, OR OpenRouter usage) for this long, assume stuck
-IDLE_TIMEOUT = 300  # 5 minutes
-
 # Patterns that indicate Cline is waiting for interactive input
 _STUCK_PATTERNS = [
     "Do you want to proceed",
@@ -228,18 +225,15 @@ class ClineRunner:
 
         stdout_lines: list[str] = []
         stderr_lines: list[str] = []
-        last_activity = _time.monotonic()
         stuck_reason: Optional[str] = None
         lock = threading.Lock()
 
         def _reader(stream, lines: list[str], label: str) -> None:
             """Read lines from a stream in a background thread."""
-            nonlocal last_activity, stuck_reason
+            nonlocal stuck_reason
             for raw in stream:
                 line = raw.rstrip("\n")
                 lines.append(line)
-                with lock:
-                    last_activity = _time.monotonic()
                 # Stderr carries Cline's live status messages (task start, errors, tool use).
                 # Log at INFO so they're visible in CI without verbose mode.
                 # Stdout is the final summary blob — keep at DEBUG.
@@ -274,11 +268,11 @@ class ClineRunner:
             t_out.start()
             t_err.start()
 
-            # Snapshot OpenRouter usage baseline for idle detection and per-run spend tracking
+            # Snapshot OpenRouter usage baseline for per-run spend tracking
             last_usage = _get_openrouter_usage()
             run_baseline = last_usage  # account total at process start
 
-            # Wait for process, checking for stuck/idle/timeout
+            # Wait for process, checking for stuck/timeout
             deadline = _time.monotonic() + timeout + 30
             check_count = 0
             while proc.poll() is None:
@@ -308,42 +302,21 @@ class ClineRunner:
                 check_count += 1
                 if check_count % 30 == 0:
                     current_usage = _get_openrouter_usage()
-                    with lock:
-                        if current_usage is not None and last_usage is not None:
-                            if current_usage > last_usage:
-                                last_activity = now
-                        idle_secs = now - last_activity
-
-                    if idle_secs > IDLE_TIMEOUT:
-                        logger.warning(
-                            f"Killing Cline: no activity for {int(idle_secs)}s "
-                            f"(no stdout and no OpenRouter usage change)"
-                        )
-                        proc.kill()
-                        proc.wait()
-                        raise ClineError(
-                            f"Cline idle for {int(idle_secs)}s — no output or API activity",
-                            stdout="\n".join(stdout_lines),
-                            stderr="\n".join(stderr_lines),
-                            exit_code=-1,
-                        )
+                    elapsed = int(now - (deadline - timeout - 30))
+                    if current_usage is not None and last_usage is not None:
+                        delta = current_usage - last_usage
+                        run_total = current_usage - run_baseline if run_baseline is not None else None
+                        run_str = f" / ${run_total:.4f} this run" if run_total is not None else ""
+                        usage_str = f" | +${delta:.4f} this interval{run_str}"
+                    elif current_usage is not None:
+                        usage_str = f" | usage=${current_usage:.4f}"
                     else:
-                        elapsed = int(now - (deadline - timeout - 30))
-                        if current_usage is not None and last_usage is not None:
-                            delta = current_usage - last_usage
-                            run_total = current_usage - run_baseline if run_baseline is not None else None
-                            run_str = f" / ${run_total:.4f} this run" if run_total is not None else ""
-                            usage_str = f" | +${delta:.4f} this interval{run_str}"
-                        elif current_usage is not None:
-                            usage_str = f" | usage=${current_usage:.4f}"
-                        else:
-                            usage_str = ""
-                        logger.info(
-                            f"Cline running: {elapsed}s elapsed"
-                            f" | idle {int(idle_secs)}s"
-                            f" | {len(stdout_lines)} output lines"
-                            f"{usage_str}"
-                        )
+                        usage_str = ""
+                    logger.info(
+                        f"Cline running: {elapsed}s elapsed"
+                        f" | {len(stdout_lines)} output lines"
+                        f"{usage_str}"
+                    )
                     if current_usage is not None:
                         last_usage = current_usage
 

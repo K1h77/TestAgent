@@ -19,6 +19,7 @@ from pathlib import Path
 # Add parent directory to path so lib/ is importable
 sys.path.insert(0, str(Path(__file__).parent))
 
+from lib.agent_config import load_config
 from lib.cline_runner import ClineRunner, ClineError
 from lib.git_ops import (
     configure_git_user,
@@ -31,7 +32,7 @@ from lib.git_ops import (
 )
 from lib.issue_parser import Issue, parse_issue, require_env
 from lib.logging_config import setup_logging, format_summary
-from lib.screenshot import take_screenshot, embed_screenshots_markdown
+from lib.screenshot import take_screenshot, take_after_screenshot_with_review, embed_screenshots_markdown
 
 logger = logging.getLogger("ralph-agent")
 
@@ -41,8 +42,11 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 MCP_SETTINGS_PATH = SCRIPTS_DIR / "cline-config" / "cline_mcp_settings.json"
 PROMPTS_DIR = SCRIPTS_DIR / "prompts"
 SCREENSHOTS_DIR = REPO_ROOT / "screenshots"
-MAX_CODING_ATTEMPTS = 3
-CODING_TIMEOUT = 1800  # 30 minutes per Cline coding attempt
+
+# Load central config from .github/agent_config.yml
+_cfg = load_config()
+MAX_CODING_ATTEMPTS = _cfg.retries.max_coding_attempts
+CODING_TIMEOUT = _cfg.timeouts.coding_seconds
 
 
 def load_prompt_template(name: str, **kwargs: str) -> str:
@@ -118,11 +122,11 @@ def run_tests() -> tuple[bool, str]:
             cwd=str(REPO_ROOT),
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=_cfg.timeouts.test_seconds,
         )
     except subprocess.TimeoutExpired:
-        logger.warning("Tests timed out after 120s")
-        return False, "Tests timed out after 120s"
+        logger.warning(f"Tests timed out after {_cfg.timeouts.test_seconds}s")
+        return False, f"Tests timed out after {_cfg.timeouts.test_seconds}s"
 
     output = result.stdout + "\n" + result.stderr
     success = result.returncode == 0
@@ -222,13 +226,13 @@ def main() -> None:
     # ── 5. Configure Cline runners ──────────────────────────────
     coding_cline = ClineRunner(
         cline_dir=REPO_ROOT / ".cline-agent",
-        model="minimax/minimax-m2.5",
-        plan_model="anthropic/claude-haiku-4.5",
+        model=_cfg.models.coding,
+        plan_model=_cfg.models.coding_plan,
         mcp_settings_path=MCP_SETTINGS_PATH,
     )
     vision_cline = ClineRunner(
         cline_dir=REPO_ROOT / ".cline-vision",
-        model="qwen/qwen3-vl-30b-a3b-instruct",
+        model=_cfg.models.vision,
         mcp_settings_path=MCP_SETTINGS_PATH,
     )
 
@@ -248,6 +252,7 @@ def main() -> None:
             issue_number=issue.number,
             issue_title=issue.title,
             issue_body=issue.body,
+            timeout=_cfg.timeouts.screenshot_seconds,
         )
 
         # ── 8. Coding loop (TDD + retry with progress check) ─────
@@ -308,19 +313,19 @@ def main() -> None:
                     f"Tests still failing after {coding_attempts} attempts. Proceeding with PR."
                 )
 
-        # ── 10. After screenshot ────────────────────────────────
-        logger.info("Taking 'after' screenshot...")
+        # ── 10. After screenshot + inline visual review ────────
+        logger.info("Taking 'after' screenshot with visual review...")
         stop_server(server)
         time.sleep(2)
         server = start_server()
 
-        after_path = take_screenshot(
+        after_path, _ = take_after_screenshot_with_review(
             vision_cline,
             SCREENSHOTS_DIR / "after.png",
-            "after",
             issue_number=issue.number,
             issue_title=issue.title,
             issue_body=issue.body,
+            timeout=_cfg.timeouts.screenshot_seconds,
         )
 
     finally:

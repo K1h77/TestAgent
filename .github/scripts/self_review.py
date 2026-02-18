@@ -19,6 +19,7 @@ from pathlib import Path
 # Add parent directory to path so lib/ is importable
 sys.path.insert(0, str(Path(__file__).parent))
 
+from lib.agent_config import load_config
 from lib.cline_runner import ClineRunner, ClineError, READ_ONLY_PERMISSIONS
 from lib.git_ops import (
     commit_and_push,
@@ -30,6 +31,7 @@ from lib.git_ops import (
 )
 from lib.issue_parser import parse_issue, require_env
 from lib.logging_config import setup_logging, format_review_summary
+from lib.screenshot import read_visual_verdict
 
 logger = logging.getLogger("self-review")
 
@@ -38,9 +40,13 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 SCRIPTS_DIR = Path(__file__).resolve().parent
 MCP_SETTINGS_PATH = SCRIPTS_DIR / "cline-config" / "cline_mcp_settings.json"
 PROMPTS_DIR = SCRIPTS_DIR / "prompts"
-MAX_REVIEW_ITERATIONS = 3
-REVIEW_TIMEOUT = 600  # 10 minutes for review
-FIX_TIMEOUT = 600  # 10 minutes for fixes
+SCREENSHOTS_DIR = REPO_ROOT / "screenshots"
+
+# Load central config from .github/agent_config.yml
+_cfg = load_config()
+MAX_REVIEW_ITERATIONS = _cfg.retries.max_review_iterations
+REVIEW_TIMEOUT = _cfg.timeouts.review_seconds
+FIX_TIMEOUT = _cfg.timeouts.fix_seconds
 
 
 def load_template(name: str, **kwargs: str) -> str:
@@ -88,14 +94,13 @@ def run_tests() -> tuple[bool, str]:
         cwd=str(REPO_ROOT),
         capture_output=True,
         text=True,
-        timeout=120,
+        timeout=_cfg.timeouts.test_seconds,
     )
     output = result.stdout + "\n" + result.stderr
     return result.returncode == 0, output
 
 
-def self_heal_loop(fixer: ClineRunner, issue, max_attempts: int = 3) -> bool:
-    """Run tests with self-healing fix attempts.
+def self_heal_loop(fixer: ClineRunner, issue, max_attempts: int = 3) -> bool:    """Run tests with self-healing fix attempts.
 
     Args:
         fixer: ClineRunner instance for fixing code.
@@ -159,7 +164,7 @@ def main() -> None:
         # Fresh reviewer context each time
         reviewer = ClineRunner(
             cline_dir=REPO_ROOT / f".cline-reviewer-{iteration}",
-            model="google/gemini-3-flash-preview",
+            model=_cfg.models.reviewer,
             command_permissions=READ_ONLY_PERMISSIONS,
         )
 
@@ -191,6 +196,19 @@ def main() -> None:
             CHANGED_FILES="\n".join(changed_files),
         )
 
+        # Prepend any visual QA findings from the after-screenshot review
+        visual_verdict = read_visual_verdict(SCREENSHOTS_DIR)
+        if visual_verdict:
+            logger.info(f"Injecting visual verdict into review prompt: {visual_verdict.splitlines()[0]}")
+            review_prompt = (
+                f"## Visual QA (from after-screenshot review)\n"
+                f"{visual_verdict}\n\n"
+                f"If the visual QA flags a FEATURE_NOT_FOUND or ISSUE, treat that as strong "
+                f"signal that the fix may be incomplete or broken visually. "
+                f"Factor this into your verdict.\n\n"
+                f"---\n\n"
+            ) + review_prompt
+
         # Run review
         try:
             result = reviewer.run(review_prompt, timeout=REVIEW_TIMEOUT, cwd=REPO_ROOT)
@@ -206,8 +224,12 @@ def main() -> None:
 
         if verdict == "LGTM":
             logger.info("Review passed!")
+            visual_verdict = read_visual_verdict(SCREENSHOTS_DIR)
+            visual_section = f"\n\n### Visual QA\n{visual_verdict}" if visual_verdict else ""
             label_pr(pr_number, "review-passed")
-            post_pr_comment(pr_number, format_review_summary(last_review_output, "PASSED"))
+            post_pr_comment(pr_number, format_review_summary(
+                last_review_output + visual_section, "PASSED"
+            ))
             return
 
         # ── Verdict is NEEDS CHANGES ────────────────────────────
@@ -216,7 +238,7 @@ def main() -> None:
 
             fixer = ClineRunner(
                 cline_dir=REPO_ROOT / f".cline-fixer-{iteration}",
-                model="minimax/minimax-m2.5",
+                model=_cfg.models.fixer,
                 mcp_settings_path=MCP_SETTINGS_PATH,
             )
 
@@ -234,7 +256,7 @@ def main() -> None:
                 logger.error(f"Fix attempt failed: {e}")
 
             # Self-heal tests after fix
-            self_heal_loop(fixer, issue, max_attempts=3)
+            self_heal_loop(fixer, issue, max_attempts=_cfg.retries.max_heal_attempts)
 
             # Commit and push fixes
             try:
@@ -251,8 +273,12 @@ def main() -> None:
 
     # ── 3. Exhausted iterations ─────────────────────────────────
     logger.warning("Max review iterations reached. Posting final review.")
+    visual_verdict = read_visual_verdict(SCREENSHOTS_DIR)
+    visual_section = f"\n\n### Visual QA\n{visual_verdict}" if visual_verdict else ""
     label_pr(pr_number, "review-needs-attention")
-    post_pr_comment(pr_number, format_review_summary(last_review_output, "NEEDS ATTENTION"))
+    post_pr_comment(pr_number, format_review_summary(
+        last_review_output + visual_section, "NEEDS ATTENTION"
+    ))
 
     logger.info("=" * 60)
     logger.info("Self-Review complete")

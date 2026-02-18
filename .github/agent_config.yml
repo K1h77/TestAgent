@@ -1,0 +1,35 @@
+# Ralph Agent — Central Configuration
+# Edit this file to change models, retry counts, and timeouts.
+# All values here are read at runtime by ralph_agent.py and self_review.py.
+
+models:
+  # Cline model used for the main TDD coding loop
+  coding: "deepseek/deepseek-v3.2"
+  # Plan-mode model for the coding Cline instance (used for planning before acting)
+  coding_plan: "anthropic/claude-haiku-4.5"
+  # Multimodal model used for before/after screenshots and visual QA
+  vision: "qwen/qwen3-vl-30b-a3b-instruct"
+  # Model used by the self-review Cline instance (read-only reviewer)
+  reviewer: "minimax/minimax-m2.5"
+  # Model used to apply reviewer feedback fixes
+  fixer: "deepseek/deepseek-v3.2"
+
+retries:
+  # Maximum number of full coding attempts before giving up and creating the PR anyway
+  max_coding_attempts: 3
+  # Maximum number of review → fix → re-review cycles in self_review.py
+  max_review_iterations: 3
+  # Maximum test-fix attempts in the self-heal loop (called after each review fix)
+  max_heal_attempts: 3
+
+timeouts:
+  # Seconds allowed per Cline coding attempt (30 min)
+  coding_seconds: 1800
+  # Seconds allowed for each review pass (10 min)
+  review_seconds: 600
+  # Seconds allowed for each review-fix pass (10 min)
+  fix_seconds: 600
+  # Seconds allowed for screenshot + visual QA (5 min)
+  screenshot_seconds: 300
+  # Seconds allowed for `npm test` runs (2 min)
+  test_seconds: 120
