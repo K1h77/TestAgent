@@ -55,20 +55,8 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
-      - name: Install Cline CLI and configure
-        run: |
-          npm install -g cline@latest
-          mkdir -p ~/.cline/data
-          cat > ~/.cline/data/globalState.json << 'CONF'
-          {
-            "welcomeViewCompleted": true,
-            "actModeApiProvider": "openrouter",
-            "actModeApiModelId": "minimax/minimax-m2.5",
-            "planModeApiProvider": "openrouter",
-            "planModeApiModelId": "google/gemini-3-flash-preview"
-          }
-          CONF
-          echo "{\"apiKey\": \"$OPENROUTER_API_KEY\"}" > ~/.cline/data/secrets.json
+      - name: Install Cline CLI
+        run: npm install -g cline@latest
 
       - name: Install Playwright MCP server and browsers
         run: |

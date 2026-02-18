@@ -76,6 +76,7 @@ class ClineRunner:
         self,
         cline_dir: Path,
         model: str,
+        plan_model: Optional[str] = None,
         mcp_settings_path: Optional[Path] = None,
         command_permissions: Optional[dict] = None,
     ):
@@ -83,7 +84,8 @@ class ClineRunner:
 
         Args:
             cline_dir: Isolated directory for Cline's config/state.
-            model: OpenRouter model ID (e.g., 'minimax/minimax-m2.5').
+            model: OpenRouter model ID for act mode (e.g., 'minimax/minimax-m2.5').
+            plan_model: OpenRouter model ID for plan mode. Defaults to model.
             mcp_settings_path: Path to cline_mcp_settings.json source file.
             command_permissions: Command permission dict. Defaults to DEFAULT_COMMAND_PERMISSIONS.
 
@@ -92,6 +94,7 @@ class ClineRunner:
         """
         self.cline_dir = Path(cline_dir)
         self.model = model
+        self.plan_model = plan_model or model
         self.mcp_settings_path = mcp_settings_path
         self.command_permissions = command_permissions or DEFAULT_COMMAND_PERMISSIONS
 
@@ -107,7 +110,8 @@ class ClineRunner:
 
     def _setup_cline_dir(self) -> None:
         """Create and configure the isolated Cline directory."""
-        self.cline_dir.mkdir(parents=True, exist_ok=True)
+        data_dir = self.cline_dir / "data"
+        data_dir.mkdir(parents=True, exist_ok=True)
 
         # Copy MCP settings if provided
         if self.mcp_settings_path and self.mcp_settings_path.exists():
@@ -116,6 +120,27 @@ class ClineRunner:
                 import shutil as sh
                 sh.copy2(self.mcp_settings_path, dest)
                 logger.debug(f"Copied MCP settings to {dest}")
+
+        # Write auth config so Cline doesn't prompt interactively
+        global_state = data_dir / "globalState.json"
+        if not global_state.exists():
+            api_key = os.environ.get("OPENROUTER_API_KEY", "")
+            state = {
+                "welcomeViewCompleted": True,
+                "actModeApiProvider": "openrouter",
+                "actModeApiModelId": self.model,
+                "planModeApiProvider": "openrouter",
+                "planModeApiModelId": self.plan_model,
+            }
+            global_state.write_text(json.dumps(state, indent=2), encoding="utf-8")
+            logger.debug(f"Wrote globalState.json to {global_state}")
+
+            if api_key:
+                secrets_file = data_dir / "secrets.json"
+                secrets_file.write_text(
+                    json.dumps({"apiKey": api_key}), encoding="utf-8"
+                )
+                logger.debug(f"Wrote secrets.json to {secrets_file}")
 
     def run(
         self,
