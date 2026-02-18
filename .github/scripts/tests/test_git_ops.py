@@ -31,10 +31,47 @@ class TestCreateBranch:
             create_branch(None)
 
     @patch("lib.git_ops._run_git")
-    def test_calls_git_checkout(self, mock_git):
-        mock_git.return_value = MagicMock(returncode=0)
+    def test_calls_git_checkout_new_branch(self, mock_git):
+        """When branch does not exist on remote, should create it with -b."""
+        def side_effect(args, check=True):
+            result = MagicMock()
+            result.returncode = 0
+            # ls-remote returns empty stdout → branch does not exist remotely
+            if args[0] == "ls-remote":
+                result.stdout = ""
+            else:
+                result.stdout = ""
+            return result
+
+        mock_git.side_effect = side_effect
         create_branch("ralph/issue-42")
-        mock_git.assert_called_once_with(["checkout", "-b", "ralph/issue-42"])
+
+        calls = [c.args[0] for c in mock_git.call_args_list]
+        assert ["fetch", "origin"] in calls
+        assert ["ls-remote", "--heads", "origin", "ralph/issue-42"] in calls
+        assert ["checkout", "-b", "ralph/issue-42"] in calls
+
+    @patch("lib.git_ops._run_git")
+    def test_calls_git_checkout_existing_remote_branch(self, mock_git):
+        """When branch already exists on remote (re-run), should checkout and reset."""
+        def side_effect(args, check=True):
+            result = MagicMock()
+            result.returncode = 0
+            # ls-remote returns a non-empty ref → branch exists remotely
+            if args[0] == "ls-remote":
+                result.stdout = "abc123\trefs/heads/ralph/issue-42\n"
+            else:
+                result.stdout = ""
+            return result
+
+        mock_git.side_effect = side_effect
+        create_branch("ralph/issue-42")
+
+        calls = [c.args[0] for c in mock_git.call_args_list]
+        assert ["checkout", "ralph/issue-42"] in calls
+        assert ["reset", "--hard", "origin/ralph/issue-42"] in calls
+        # Should NOT call checkout -b
+        assert ["checkout", "-b", "ralph/issue-42"] not in calls
 
     @patch("lib.git_ops._run_git")
     def test_git_failure_raises(self, mock_git):
@@ -74,23 +111,91 @@ class TestCommitAndPush:
 
     @patch("lib.git_ops._run_git")
     def test_successful_commit_and_push(self, mock_git):
-        """Should call git add, check status, commit, and push."""
-        call_count = 0
-
+        """Should call git add, check status, commit, and push (check=False)."""
         def side_effect(args, check=True):
-            nonlocal call_count
-            call_count += 1
             result = MagicMock()
-            if args[0] == "status":
-                result.stdout = "M server.js\n"
-            else:
-                result.stdout = ""
             result.returncode = 0
+            result.stdout = "M server.js\n" if args[0] == "status" else ""
+            result.stderr = ""
             return result
 
         mock_git.side_effect = side_effect
         commit_and_push("fix bug", "ralph/issue-1")
-        assert call_count == 4  # add, status, commit, push
+
+        calls = [c.args[0] for c in mock_git.call_args_list]
+        assert ["add", "-A"] in calls
+        assert ["status", "--porcelain"] in calls
+        assert ["commit", "-m", "fix bug"] in calls
+        assert ["push", "origin", "ralph/issue-1"] in calls
+
+    @patch("lib.git_ops._run_git")
+    def test_push_retries_after_non_fast_forward(self, mock_git):
+        """On non-fast-forward push rejection, should pull --rebase then retry push."""
+        push_attempt = 0
+
+        def side_effect(args, check=True):
+            nonlocal push_attempt
+            result = MagicMock()
+            result.stdout = "M server.js\n" if args[0] == "status" else ""
+            result.stderr = ""
+            if args[0] == "push":
+                push_attempt += 1
+                if push_attempt == 1:
+                    # First push attempt: rejected
+                    result.returncode = 1
+                    result.stderr = "! [rejected] non-fast-forward"
+                else:
+                    result.returncode = 0
+            else:
+                result.returncode = 0
+            return result
+
+        mock_git.side_effect = side_effect
+        commit_and_push("fix bug", "ralph/issue-1")
+
+        calls = [c.args[0] for c in mock_git.call_args_list]
+        # Should have attempted a pull --rebase after rejection
+        assert ["pull", "--rebase", "origin", "ralph/issue-1"] in calls
+        # And pushed a second time
+        assert push_attempt == 2
+
+    @patch("lib.git_ops._run_git")
+    def test_non_fast_forward_raises_after_rebase_fails(self, mock_git):
+        """If the retry push also fails, should raise GitError."""
+        def side_effect(args, check=True):
+            result = MagicMock()
+            result.stdout = "M server.js\n" if args[0] == "status" else ""
+            if args[0] == "push":
+                result.returncode = 1
+                result.stderr = "! [rejected] non-fast-forward"
+            elif check is False:
+                result.returncode = 0
+                result.stderr = ""
+            else:
+                result.returncode = 0
+                result.stderr = ""
+            return result
+
+        # Make the second push (after rebase) also fail — _run_git with check=True raises
+        call_count = {"push": 0}
+        def side_effect2(args, check=True):
+            result = MagicMock()
+            result.stdout = "M server.js\n" if args[0] == "status" else ""
+            result.stderr = ""
+            result.returncode = 0
+            if args[0] == "push":
+                call_count["push"] += 1
+                if call_count["push"] == 1:
+                    result.returncode = 1
+                    result.stderr = "! [rejected] non-fast-forward"
+                else:
+                    # Second push (check=True default) raises via _run_git
+                    raise GitError("push failed again", exit_code=1)
+            return result
+
+        mock_git.side_effect = side_effect2
+        with pytest.raises(GitError):
+            commit_and_push("fix bug", "ralph/issue-1")
 
 
 class TestCreatePr:

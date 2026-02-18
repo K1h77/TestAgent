@@ -61,6 +61,28 @@ class TestTakeScreenshot:
         result = take_screenshot(mock_cline, output_path, "before")
         assert result is None
 
+    def test_logs_other_pngs_when_expected_file_missing(self, tmp_path):
+        """When expected file is missing, should log any other PNGs saved by Cline."""
+        output_path = tmp_path / "before.png"
+
+        def save_differently(*args, **kwargs):
+            # Cline saved to a different filename
+            (tmp_path / "switch.png").write_bytes(b"\x89PNG fake")
+            return MagicMock(success=True)
+
+        mock_cline = MagicMock()
+        mock_cline.run.side_effect = save_differently
+
+        import logging
+        with patch("lib.screenshot.logger") as mock_logger:
+            result = take_screenshot(mock_cline, output_path, "before")
+            assert result is None
+            # Warning should mention the actually-saved filename
+            warning_calls = " ".join(
+                str(c) for c in mock_logger.warning.call_args_list
+            )
+            assert "switch.png" in warning_calls
+
     def test_returns_none_when_file_empty(self, tmp_path):
         """Should return None when screenshot file is 0 bytes."""
         output_path = tmp_path / "screenshot.png"

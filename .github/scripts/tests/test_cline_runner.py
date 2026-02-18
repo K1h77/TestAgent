@@ -82,6 +82,35 @@ class TestClineRunnerInit:
         assert json.loads(dest.read_text()) == {"mcpServers": {}}
 
     @patch("shutil.which", return_value="/usr/bin/cline")
+    def test_overwrites_mcp_settings_on_reinit(self, mock_which, tmp_path):
+        """MCP settings should always be overwritten, not skipped if already exist."""
+        cline_dir = tmp_path / "cline-test"
+        mcp_src = tmp_path / "mcp_settings.json"
+        mcp_src.write_text('{"mcpServers": {"old": {}}}')
+
+        # First init
+        ClineRunner(cline_dir=cline_dir, model="test/model", mcp_settings_path=mcp_src)
+
+        # Update source and reinit
+        mcp_src.write_text('{"mcpServers": {"new": {}}}')
+        ClineRunner(cline_dir=cline_dir, model="test/model", mcp_settings_path=mcp_src)
+
+        dest = cline_dir / "data" / "settings" / "cline_mcp_settings.json"
+        assert json.loads(dest.read_text()) == {"mcpServers": {"new": {}}}
+
+    @patch("shutil.which", return_value="/usr/bin/cline")
+    def test_overwrites_global_state_on_reinit(self, mock_which, tmp_path):
+        """globalState.json should always reflect the current model, not be cached."""
+        cline_dir = tmp_path / "cline-test"
+
+        ClineRunner(cline_dir=cline_dir, model="model-v1")
+        state_path = cline_dir / "data" / "globalState.json"
+        assert json.loads(state_path.read_text())["actModeApiModelId"] == "model-v1"
+
+        ClineRunner(cline_dir=cline_dir, model="model-v2")
+        assert json.loads(state_path.read_text())["actModeApiModelId"] == "model-v2"
+
+    @patch("shutil.which", return_value="/usr/bin/cline")
     def test_default_permissions(self, mock_which, tmp_path):
         runner = ClineRunner(cline_dir=tmp_path / "c", model="test/model")
         assert runner.command_permissions == DEFAULT_COMMAND_PERMISSIONS
