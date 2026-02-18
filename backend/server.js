@@ -18,6 +18,16 @@ let tasks = [
 ];
 let nextId = 2;
 
+// In-memory storage for users
+let users = [];
+for (let i = 1; i <= 25; i++) {
+  users.push({
+    id: i,
+    name: `User ${i}`,
+    email: `user${i}@example.com`
+  });
+}
+
 // Routes
 app.get('/', (req, res) => {
   res.json({ message: 'Task Manager API - Server is running!' });
@@ -81,6 +91,34 @@ app.delete('/api/tasks/:id', (req, res) => {
   res.json({ message: 'Task deleted successfully' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+// Get users with pagination
+app.get('/api/users', (req, res) => {
+  // Parse query parameters with defaults
+  const page = parseInt(req.query.page) || 1;
+  const pageSize = parseInt(req.query.pageSize) || 10;
+  
+  // Calculate pagination
+  const startIndex = (page - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  
+  // Get paginated users
+  const paginatedUsers = users.slice(startIndex, endIndex);
+  
+  // Return paginated response
+  res.json({
+    users: paginatedUsers,
+    total: users.length,
+    page: page,
+    pageSize: pageSize,
+    totalPages: Math.ceil(users.length / pageSize)
+  });
 });
+
+// Only start the server if this file is run directly (not required for testing)
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
