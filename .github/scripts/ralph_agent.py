@@ -196,12 +196,12 @@ def main() -> None:
     coding_cline = ClineRunner(
         cline_dir=REPO_ROOT / ".cline-agent",
         model="minimax/minimax-m2.5",
-        plan_model="google/gemini-3-flash-preview",
+        plan_model="anthropic/claude-haiku-4.5",
         mcp_settings_path=MCP_SETTINGS_PATH,
     )
     vision_cline = ClineRunner(
         cline_dir=REPO_ROOT / ".cline-agent",
-        model="google/gemini-3-flash-preview",
+        model="anthropic/claude-haiku-4.5",
         mcp_settings_path=MCP_SETTINGS_PATH,
     )
 
