@@ -10,6 +10,8 @@ import logging
 import os
 import shutil
 import subprocess
+import threading
+import time as _time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -185,8 +187,16 @@ class ClineRunner:
         logger.debug(f"CLINE_DIR={self.cline_dir}")
         logger.debug(f"Prompt length: {len(prompt)} chars")
 
-        stdout_lines = []
-        stderr_lines = []
+        stdout_lines: list[str] = []
+        stderr_lines: list[str] = []
+
+        def _reader(stream, lines: list[str], label: str) -> None:
+            """Read lines from a stream in a background thread."""
+            for raw in stream:
+                line = raw.rstrip("\n")
+                lines.append(line)
+                logger.debug(f"[cline {label}] {line}")
+
         try:
             proc = subprocess.Popen(
                 cmd,
@@ -197,45 +207,30 @@ class ClineRunner:
                 cwd=str(cwd) if cwd else None,
             )
 
-            import select
-            import time as _time
+            # Stream stdout/stderr via background threads so neither blocks
+            t_out = threading.Thread(
+                target=_reader, args=(proc.stdout, stdout_lines, "stdout"), daemon=True
+            )
+            t_err = threading.Thread(
+                target=_reader, args=(proc.stderr, stderr_lines, "stderr"), daemon=True
+            )
+            t_out.start()
+            t_err.start()
 
+            # Wait for process with our own timeout (Cline has --timeout too,
+            # but we add a 30s grace period before hard-killing)
             deadline = _time.monotonic() + timeout + 30
             while proc.poll() is None:
                 remaining = deadline - _time.monotonic()
                 if remaining <= 0:
                     proc.kill()
+                    proc.wait()
                     raise subprocess.TimeoutExpired(cmd, timeout)
+                _time.sleep(1)
 
-                # Read available output without blocking forever
-                try:
-                    # Try non-blocking reads with a short timeout
-                    if proc.stdout and proc.stdout.readable():
-                        line = proc.stdout.readline()
-                        if line:
-                            line = line.rstrip("\n")
-                            stdout_lines.append(line)
-                            logger.info(f"[cline] {line}")
-                    if proc.stderr and proc.stderr.readable():
-                        line = proc.stderr.readline()
-                        if line:
-                            line = line.rstrip("\n")
-                            stderr_lines.append(line)
-                            logger.info(f"[cline stderr] {line}")
-                except Exception:
-                    _time.sleep(0.1)
-
-            # Read any remaining output after process exits
-            if proc.stdout:
-                for line in proc.stdout:
-                    line = line.rstrip("\n")
-                    stdout_lines.append(line)
-                    logger.info(f"[cline] {line}")
-            if proc.stderr:
-                for line in proc.stderr:
-                    line = line.rstrip("\n")
-                    stderr_lines.append(line)
-                    logger.info(f"[cline stderr] {line}")
+            # Process exited — let reader threads finish draining
+            t_out.join(timeout=5)
+            t_err.join(timeout=5)
 
             result_stdout = "\n".join(stdout_lines)
             result_stderr = "\n".join(stderr_lines)

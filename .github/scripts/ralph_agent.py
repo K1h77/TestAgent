@@ -42,7 +42,7 @@ MCP_SETTINGS_PATH = SCRIPTS_DIR / "cline-config" / "cline_mcp_settings.json"
 PROMPTS_DIR = SCRIPTS_DIR / "prompts"
 SCREENSHOTS_DIR = REPO_ROOT / "screenshots"
 MAX_HEAL_ATTEMPTS = 5
-CLINE_TIMEOUT = 600  # 10 minutes per Cline invocation
+CLINE_TIMEOUT = 1800  # 30 minutes per Cline invocation
 
 
 def load_prompt_template(name: str, **kwargs: str) -> str:

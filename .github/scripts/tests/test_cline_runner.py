@@ -106,14 +106,16 @@ class TestClineRunnerRun:
         with pytest.raises(ValueError, match="empty"):
             runner.run("")
 
+    @patch("time.sleep")
     @patch("shutil.which", return_value="/usr/bin/cline")
     @patch("subprocess.Popen")
-    def test_successful_run(self, mock_popen, mock_which, tmp_path):
+    def test_successful_run(self, mock_popen, mock_which, mock_sleep, tmp_path):
         mock_proc = MagicMock()
         mock_proc.poll.side_effect = [None, 0]
         mock_proc.returncode = 0
         mock_proc.stdout = iter(["task completed\n"])
         mock_proc.stderr = iter([])
+        mock_proc.wait.return_value = 0
         mock_popen.return_value = mock_proc
 
         runner = ClineRunner(cline_dir=tmp_path / "c", model="minimax/minimax-m2.5")
@@ -131,14 +133,16 @@ class TestClineRunnerRun:
         assert "--model" in cmd
         assert "minimax/minimax-m2.5" in cmd
 
+    @patch("time.sleep")
     @patch("shutil.which", return_value="/usr/bin/cline")
     @patch("subprocess.Popen")
-    def test_nonzero_exit_raises(self, mock_popen, mock_which, tmp_path):
+    def test_nonzero_exit_raises(self, mock_popen, mock_which, mock_sleep, tmp_path):
         mock_proc = MagicMock()
         mock_proc.poll.side_effect = [None, 1]
         mock_proc.returncode = 1
         mock_proc.stdout = iter(["partial output\n"])
         mock_proc.stderr = iter(["something went wrong\n"])
+        mock_proc.wait.return_value = 1
         mock_popen.return_value = mock_proc
 
         runner = ClineRunner(cline_dir=tmp_path / "c", model="test/model")
@@ -157,14 +161,16 @@ class TestClineRunnerRun:
         with pytest.raises(ClineError, match="not found"):
             runner.run("Fix the bug", timeout=600)
 
+    @patch("time.sleep")
     @patch("shutil.which", return_value="/usr/bin/cline")
     @patch("subprocess.Popen")
-    def test_sets_env_vars(self, mock_popen, mock_which, tmp_path):
+    def test_sets_env_vars(self, mock_popen, mock_which, mock_sleep, tmp_path):
         mock_proc = MagicMock()
         mock_proc.poll.side_effect = [None, 0]
         mock_proc.returncode = 0
         mock_proc.stdout = iter(["ok\n"])
         mock_proc.stderr = iter([])
+        mock_proc.wait.return_value = 0
         mock_popen.return_value = mock_proc
 
         cline_dir = tmp_path / "c"
