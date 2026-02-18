@@ -185,43 +185,82 @@ class ClineRunner:
         logger.debug(f"CLINE_DIR={self.cline_dir}")
         logger.debug(f"Prompt length: {len(prompt)} chars")
 
+        stdout_lines = []
+        stderr_lines = []
         try:
-            result = subprocess.run(
+            proc = subprocess.Popen(
                 cmd,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=timeout + 30,  # Extra buffer for Cline's own timeout
                 env=env,
                 cwd=str(cwd) if cwd else None,
             )
-        except subprocess.TimeoutExpired as e:
+
+            import select
+            import time as _time
+
+            deadline = _time.monotonic() + timeout + 30
+            while proc.poll() is None:
+                remaining = deadline - _time.monotonic()
+                if remaining <= 0:
+                    proc.kill()
+                    raise subprocess.TimeoutExpired(cmd, timeout)
+
+                # Read available output without blocking forever
+                try:
+                    # Try non-blocking reads with a short timeout
+                    if proc.stdout and proc.stdout.readable():
+                        line = proc.stdout.readline()
+                        if line:
+                            line = line.rstrip("\n")
+                            stdout_lines.append(line)
+                            logger.info(f"[cline] {line}")
+                    if proc.stderr and proc.stderr.readable():
+                        line = proc.stderr.readline()
+                        if line:
+                            line = line.rstrip("\n")
+                            stderr_lines.append(line)
+                            logger.info(f"[cline stderr] {line}")
+                except Exception:
+                    _time.sleep(0.1)
+
+            # Read any remaining output after process exits
+            if proc.stdout:
+                for line in proc.stdout:
+                    line = line.rstrip("\n")
+                    stdout_lines.append(line)
+                    logger.info(f"[cline] {line}")
+            if proc.stderr:
+                for line in proc.stderr:
+                    line = line.rstrip("\n")
+                    stderr_lines.append(line)
+                    logger.info(f"[cline stderr] {line}")
+
+            result_stdout = "\n".join(stdout_lines)
+            result_stderr = "\n".join(stderr_lines)
+            returncode = proc.returncode
+
+        except subprocess.TimeoutExpired:
             logger.error(f"Cline timed out after {timeout}s")
             raise ClineError(
                 f"Cline timed out after {timeout} seconds",
-                stdout=e.stdout or "",
-                stderr=e.stderr or "",
+                stdout="\n".join(stdout_lines),
+                stderr="\n".join(stderr_lines),
                 exit_code=-1,
-            ) from e
+            )
         except FileNotFoundError:
             raise ClineError(
                 "Cline CLI binary not found. Is it installed globally?",
                 exit_code=-1,
             )
 
-        # Log full output at debug level (visible in workflow logs)
-        if result.stdout:
-            for line in result.stdout.splitlines():
-                logger.debug(f"[cline stdout] {line}")
-        if result.stderr:
-            for line in result.stderr.splitlines():
-                logger.debug(f"[cline stderr] {line}")
-
-        logger.info(f"Cline finished (exit_code={result.returncode})")
+        logger.info(f"Cline finished (exit_code={returncode})")
 
         cline_result = ClineResult(
-            stdout=result.stdout,
-            stderr=result.stderr,
-            exit_code=result.returncode,
+            stdout=result_stdout,
+            stderr=result_stderr,
+            exit_code=returncode,
         )
 
         if not cline_result.success:
