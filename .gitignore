@@ -5,7 +5,6 @@ npm-debug.log
 .env
 dist/
 build/
-screenshots/
 .aider*
 
 # Cline agent working directories — contain secrets.json with the OpenRouter API key
