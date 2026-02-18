@@ -1,5 +1,55 @@
 const API_URL = 'http://localhost:3000/api';
 
+// Alert Component (make it globally accessible)
+window.showAlert = function showAlert(message, type = 'info') {
+    const alertContainer = document.getElementById('alertContainer');
+    
+    // Create alert element
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type}`;
+    
+    // Add icon based on type
+    let icon = '';
+    if (type === 'success') {
+        icon = '✓';
+    } else if (type === 'error') {
+        icon = '✕';
+    } else if (type === 'info') {
+        icon = 'ℹ';
+    }
+    
+    alert.innerHTML = `
+        <span class="alert-icon">${icon}</span>
+        <span class="alert-message">${escapeHtml(message)}</span>
+        <button class="alert-close" onclick="dismissAlert(this)">✕</button>
+    `;
+    
+    // Add to container
+    alertContainer.appendChild(alert);
+    
+    // Show alert with animation
+    setTimeout(() => {
+        alert.classList.add('show');
+    }, 10);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        dismissAlert(alert.querySelector('.alert-close'));
+    }, 5000);
+}
+
+function dismissAlert(closeButton) {
+    const alert = closeButton.parentElement || closeButton;
+    alert.classList.remove('show');
+    
+    // Remove from DOM after animation
+    setTimeout(() => {
+        if (alert.parentElement) {
+            alert.parentElement.removeChild(alert);
+        }
+    }, 300);
+}
+
 // Handle login and show main UI
 document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('loginForm');
@@ -64,7 +114,7 @@ async function addTask() {
     const description = descriptionInput.value.trim();
     
     if (!title) {
-        alert('Please enter a task title');
+        showAlert('Please enter a task title', 'error');
         return;
     }
     
@@ -80,9 +130,10 @@ async function addTask() {
         if (response.ok) {
             titleInput.value = '';
             descriptionInput.value = '';
+            showAlert('Task added successfully', 'success');
             loadTasks();
         } else {
-            alert('Failed to add task');
+            showAlert('Failed to add task', 'error');
         }
     } catch (error) {
         console.error('Error adding task:', error);
@@ -102,9 +153,10 @@ async function toggleTask(id, completed) {
         });
         
         if (response.ok) {
+            showAlert('Task updated successfully', 'success');
             loadTasks();
         } else {
-            alert('Failed to update task');
+            showAlert('Failed to update task', 'error');
         }
     } catch (error) {
         console.error('Error updating task:', error);
@@ -124,9 +176,10 @@ async function deleteTask(id) {
         });
         
         if (response.ok) {
+            showAlert('Task deleted successfully', 'success');
             loadTasks();
         } else {
-            alert('Failed to delete task');
+            showAlert('Failed to delete task', 'error');
         }
     } catch (error) {
         console.error('Error deleting task:', error);

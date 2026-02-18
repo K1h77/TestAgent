@@ -299,3 +299,100 @@ button:active {
 .profile-field span {
     color: #333;
 }
+
+/* Alert Component Styles */
+#alertContainer {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 400px;
+}
+
+.alert {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    background: white;
+    border-left: 4px solid;
+    opacity: 0;
+    transform: translateX(400px);
+    transition: all 0.3s ease-in-out;
+    min-width: 300px;
+}
+
+.alert.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.alert-icon {
+    font-size: 24px;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.alert-message {
+    flex: 1;
+    color: #333;
+    font-size: 15px;
+    line-height: 1.4;
+}
+
+.alert-close {
+    background: transparent;
+    color: #666;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background 0.2s, transform 0.2s;
+    flex-shrink: 0;
+}
+
+.alert-close:hover {
+    background: rgba(0, 0, 0, 0.1);
+    transform: scale(1.1);
+}
+
+/* Success Alert */
+.alert-success {
+    border-left-color: #38ef7d;
+    background: linear-gradient(to right, #e8f9f0 0%, #ffffff 100%);
+}
+
+.alert-success .alert-icon {
+    color: #11998e;
+}
+
+/* Error Alert */
+.alert-error {
+    border-left-color: #f45c43;
+    background: linear-gradient(to right, #ffe8e6 0%, #ffffff 100%);
+}
+
+.alert-error .alert-icon {
+    color: #eb3349;
+}
+
+/* Info Alert */
+.alert-info {
+    border-left-color: #667eea;
+    background: linear-gradient(to right, #e8ebf9 0%, #ffffff 100%);
+}
+
+.alert-info .alert-icon {
+    color: #667eea;
+}
