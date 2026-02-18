@@ -1,0 +1,41 @@
+{
+  "welcomeViewCompleted": true,
+  "actModeApiProvider": "openrouter",
+  "actModeApiModelId": "deepseek/deepseek-v3.2",
+  "planModeApiProvider": "openrouter",
+  "planModeApiModelId": "anthropic/claude-haiku-4.5",
+  "remoteRulesToggles": {},
+  "remoteWorkflowToggles": {},
+  "actModeOpenRouterModelId": "deepseek/deepseek-v3.2",
+  "actModeThinkingBudgetTokens": 0,
+  "planModeThinkingBudgetTokens": 0,
+  "yoloModeToggled": false,
+  "autoApprovalSettings": {
+    "version": 4,
+    "enabled": true,
+    "favorites": [],
+    "maxRequests": 20,
+    "actions": {
+      "readFiles": true,
+      "readFilesExternally": false,
+      "editFiles": false,
+      "editFilesExternally": false,
+      "executeSafeCommands": true,
+      "executeAllCommands": false,
+      "useBrowser": false,
+      "useMcp": true
+    },
+    "enableNotifications": false
+  },
+  "workspaceRoots": [
+    {
+      "path": "/home/runner/work/TestAgent/TestAgent",
+      "name": "TestAgent",
+      "vcs": "git",
+      "commitHash": "1fe7d42a151fd4351797eb20437b4906f4688fc8"
+    }
+  ],
+  "primaryRootIndex": 0,
+  "globalWorkflowToggles": {},
+  "globalClineRulesToggles": {}
+}

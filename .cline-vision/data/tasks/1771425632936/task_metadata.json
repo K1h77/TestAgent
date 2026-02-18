@@ -1,0 +1,22 @@
+{
+  "files_in_context": [],
+  "model_usage": [
+    {
+      "ts": 1771425633059,
+      "model_id": "qwen/qwen3-vl-30b-a3b-instruct",
+      "model_provider_id": "openrouter",
+      "mode": "act"
+    }
+  ],
+  "environment_history": [
+    {
+      "ts": 1771425633055,
+      "os_name": "linux",
+      "os_version": "6.14.0-1017-azure",
+      "os_arch": "x64",
+      "host_name": "Cline CLI - Node.js",
+      "host_version": "2.4.0",
+      "cline_version": "3.64.0"
+    }
+  ]
+}
