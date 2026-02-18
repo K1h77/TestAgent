@@ -1,1 +1,2 @@
 aider-chat==0.67.0
+pytest>=8.0.0
