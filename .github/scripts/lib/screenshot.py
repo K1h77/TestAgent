@@ -18,25 +18,24 @@ class ScreenshotError(Exception):
 
 
 SCREENSHOT_PROMPT_TEMPLATE = (
-    "Using the Playwright MCP server, do the following:\n"
+    "Using the Playwright MCP server ONLY (do NOT read files or run shell commands), "
+    "capture a '{label}' screenshot for this GitHub issue:\n"
     "\n"
-    "## Context\n"
-    "You are capturing a '{label}' screenshot for this GitHub issue:\n"
-    "- **Issue #{issue_number}:** {issue_title}\n"
-    "- **Description:** {issue_body}\n"
+    "Issue #{issue_number}: {issue_title}\n"
+    "Description: {issue_body}\n"
     "\n"
-    "## Instructions\n"
-    "The app is running at http://localhost:3000.\n"
-    "Based on the issue description, figure out which page and interaction "
-    "best demonstrates the relevant area of the app. This may involve:\n"
-    "- Navigating to a specific route (not just the homepage)\n"
-    "- Clicking buttons, filling out forms, or triggering UI states\n"
-    "- Scrolling to a specific section\n"
+    "Steps:\n"
+    "1. Launch a browser and navigate to http://localhost:3000\n"
+    "2. If a login form is present, log in with username 'testuser' and password 'password'\n"
+    "3. Based on the issue description, navigate to the relevant page and trigger the "
+    "relevant UI state using only Playwright browser interactions (click, navigate, fill, etc.). "
+    "For example: if the issue mentions a settings page, click through to it; if it mentions "
+    "a toggle or switch, click it; if it mentions a modal, open it. "
+    "Use the page's own navigation (links, buttons, menus) to get there — do NOT run shell "
+    "commands or read source files to figure out routes.\n"
+    "4. Once the relevant state is visible, take a full-page screenshot and save it to: {output_path}\n"
     "\n"
-    "If there is a login form blocking you, use 'testuser' / 'password'.\n"
-    "\n"
-    "Once you have navigated to the relevant state, take a full-page screenshot "
-    "and save it to: {output_path}\n"
+    "IMPORTANT: Use only Playwright MCP tools. Do not run npm, cat, ls, or any shell commands."
 )
 
 
@@ -62,7 +61,7 @@ def take_screenshot(
     logger.info(f"Taking '{label}' screenshot → {output_path}")
 
     try:
-        cline_runner.run(prompt, timeout=120)
+        cline_runner.run(prompt, timeout=300)
     except Exception as e:
         logger.warning(
             f"Screenshot '{label}' failed (non-blocking): {e}. "
