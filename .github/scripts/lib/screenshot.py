@@ -17,9 +17,9 @@ class ScreenshotError(Exception):
     pass
 
 
-SCREENSHOT_PROMPT_TEMPLATE = (
+BEFORE_SCREENSHOT_PROMPT_TEMPLATE = (
     "Using the Playwright MCP server ONLY (do NOT read files or run shell commands), "
-    "capture a '{label}' screenshot for this GitHub issue:\n"
+    "take a BEFORE screenshot of the app as it currently exists.\n"
     "\n"
     "Issue #{issue_number}: {issue_title}\n"
     "Description: {issue_body}\n"
@@ -27,16 +27,17 @@ SCREENSHOT_PROMPT_TEMPLATE = (
     "Steps:\n"
     "1. Launch a browser and navigate to http://localhost:3000\n"
     "2. If a login form is present, log in with username 'testuser' and password 'password'\n"
-    "3. Navigate to the most relevant page for this issue using the app's own navigation "
-    "(links, buttons, menus). Do NOT run shell commands or read source files.\n"
-    "   - If this is a 'before' screenshot: the feature described in the issue may not exist yet. "
-    "Just navigate to where it would logically appear and take the screenshot as-is.\n"
-    "   - If this is an 'after' screenshot: the feature should now be implemented. Interact with it "
-    "(e.g. click the toggle, open the modal, trigger the UI state) so the screenshot shows it working.\n"
-    "4. Once the relevant state is visible, use the Playwright MCP screenshot tool to take a "
+    "3. Using the app's own navigation (links, buttons, menus), navigate to the page or section "
+    "where the feature described in the issue will likely be added. "
+    "This feature does NOT exist yet — do not search for it or try to interact with it. "
+    "Just get to the right area of the app.\n"
+    "4. Once on the relevant page, immediately use the Playwright MCP screenshot tool to take a "
     "full-page screenshot and save it to: {output_path}\n"
     "\n"
-    "IMPORTANT: Use only Playwright MCP tools. Do not run npm, cat, ls, or any shell commands."
+    "CRITICAL: This is a BEFORE screenshot. The feature has NOT been implemented yet. "
+    "If you cannot find a UI element related to the issue, that is expected — just take the "
+    "screenshot of the current page and stop. Do NOT spend time searching or retrying. "
+    "Use only Playwright MCP tools. Do not run npm, cat, ls, or any shell commands."
 )
 
 AFTER_SCREENSHOT_REVIEW_PROMPT_TEMPLATE = (
@@ -85,7 +86,6 @@ AFTER_SCREENSHOT_REVIEW_PROMPT_TEMPLATE = (
 def take_screenshot(
     cline_runner,
     output_path: Path,
-    label: str,
     issue_number: int = 0,
     issue_title: str = "",
     issue_body: str = "",
@@ -94,15 +94,14 @@ def take_screenshot(
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    prompt = SCREENSHOT_PROMPT_TEMPLATE.format(
+    prompt = BEFORE_SCREENSHOT_PROMPT_TEMPLATE.format(
         output_path=str(output_path),
-        label=label,
         issue_number=issue_number,
         issue_title=issue_title,
         issue_body=issue_body[:2000],
     )
 
-    logger.info(f"Taking '{label}' screenshot → {output_path}")
+    logger.info(f"Taking 'before' screenshot → {output_path}")
 
     try:
         cline_runner.run(prompt, timeout=timeout)

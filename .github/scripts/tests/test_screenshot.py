@@ -11,7 +11,7 @@ from lib.screenshot import (
     take_screenshot,
     embed_screenshots_markdown,
     _to_relative_path,
-    SCREENSHOT_PROMPT_TEMPLATE,
+    BEFORE_SCREENSHOT_PROMPT_TEMPLATE,
 )
 from lib.cline_runner import ClineError
 
@@ -25,7 +25,7 @@ class TestTakeScreenshot:
         output_path = tmp_path / "subdir" / "screenshot.png"
 
         # Cline succeeds but doesn't actually create the file
-        take_screenshot(mock_cline, output_path, "test")
+        take_screenshot(mock_cline, output_path)
 
         assert output_path.parent.exists()
 
@@ -41,7 +41,7 @@ class TestTakeScreenshot:
 
         mock_cline.run.side_effect = create_file
 
-        result = take_screenshot(mock_cline, output_path, "before")
+        result = take_screenshot(mock_cline, output_path)
         assert result == output_path
 
     def test_returns_none_when_cline_fails(self, tmp_path):
@@ -50,7 +50,7 @@ class TestTakeScreenshot:
         mock_cline.run.side_effect = ClineError("failed")
 
         output_path = tmp_path / "screenshot.png"
-        result = take_screenshot(mock_cline, output_path, "before")
+        result = take_screenshot(mock_cline, output_path)
         assert result is None
 
     def test_returns_none_when_file_not_created(self, tmp_path):
@@ -58,7 +58,7 @@ class TestTakeScreenshot:
         mock_cline = MagicMock()
         output_path = tmp_path / "screenshot.png"
 
-        result = take_screenshot(mock_cline, output_path, "before")
+        result = take_screenshot(mock_cline, output_path)
         assert result is None
 
     def test_adopts_misnamed_png_when_expected_file_missing(self, tmp_path):
@@ -74,7 +74,7 @@ class TestTakeScreenshot:
         mock_cline.run.side_effect = save_differently
 
         with patch("lib.screenshot.logger") as mock_logger:
-            result = take_screenshot(mock_cline, output_path, "before")
+            result = take_screenshot(mock_cline, output_path)
             # Should rename switch.png → before.png and return the path
             assert result == output_path
             assert output_path.exists()
@@ -95,19 +95,19 @@ class TestTakeScreenshot:
 
         mock_cline.run.side_effect = create_empty
 
-        result = take_screenshot(mock_cline, output_path, "before")
+        result = take_screenshot(mock_cline, output_path)
         assert result is None
 
-    def test_prompt_includes_label(self, tmp_path):
-        """Should include the label in the prompt sent to Cline."""
+    def test_prompt_includes_before_context(self, tmp_path):
+        """Should include 'BEFORE' context in the prompt sent to Cline."""
         mock_cline = MagicMock()
         output_path = tmp_path / "screenshot.png"
 
-        take_screenshot(mock_cline, output_path, "before")
+        take_screenshot(mock_cline, output_path)
 
         call_args = mock_cline.run.call_args
         prompt = call_args[0][0]
-        assert "before" in prompt
+        assert "BEFORE" in prompt
 
 
 class TestEmbedScreenshotsMarkdown:

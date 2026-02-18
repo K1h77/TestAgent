@@ -249,7 +249,6 @@ def main() -> None:
         before_path = take_screenshot(
             vision_cline,
             SCREENSHOTS_DIR / "before.png",
-            "before",
             issue_number=issue.number,
             issue_title=issue.title,
             issue_body=issue.body,
