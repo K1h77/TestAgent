@@ -147,6 +147,20 @@ def commit_and_push(message: str, branch: str) -> None:
     # Stage all changes
     _run_git(["add", "-A"])
 
+    # Safety check: abort if any secrets.json files are staged (API key leak guard)
+    staged = _run_git(["diff", "--cached", "--name-only"])
+    secret_files = [f for f in staged.stdout.splitlines() if "secrets.json" in f or "globalState.json" in f]
+    if secret_files:
+        _run_git(["reset", "HEAD"] + secret_files)  # unstage them
+        logger.error(
+            f"SECURITY: Attempted to commit files that may contain secrets: {secret_files}. "
+            "They have been unstaged. Add the .cline-*/ directories to .gitignore."
+        )
+        raise GitError(
+            f"Aborting commit: sensitive files were staged: {secret_files}. "
+            "Check that .cline-*/ is in .gitignore."
+        )
+
     # Check if there are actually changes to commit
     status = _run_git(["status", "--porcelain"])
     if not status.stdout.strip():

@@ -94,6 +94,14 @@ jobs:
         id: agent
         run: python .github/scripts/ralph_agent.py
 
+      # ── Scrub Cline working dirs (contain secrets.json) ───────
+      # Runs immediately after the agent, before upload/review steps,
+      # so secrets are never present when any following step could
+      # accidentally stage or expose them.
+      - name: Remove Cline agent working directories
+        if: always()
+        run: rm -rf .cline-agent .cline-vision .cline-reviewer-* .cline-fixer-*
+
       # ── Upload Screenshots ────────────────────────────────────
       - name: Upload screenshots
         if: always()

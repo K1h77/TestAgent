@@ -7,3 +7,8 @@ dist/
 build/
 screenshots/
 .aider*
+
+# Cline agent working directories — contain secrets.json with the OpenRouter API key
+.cline-*/
+.cline-agent/
+.cline-vision/
