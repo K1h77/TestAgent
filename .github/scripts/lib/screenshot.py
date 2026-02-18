@@ -54,7 +54,7 @@ def take_screenshot(
         cline_runner.run(prompt, timeout=timeout)
     except Exception as e:
         logger.warning(
-            f"Screenshot '{label}' failed (non-blocking): {e}. "
+            f"Before screenshot failed (non-blocking): {e}. "
             f"Continuing without screenshot."
         )
         return None
@@ -67,23 +67,23 @@ def take_screenshot(
         if saved:
             best = saved[0]
             logger.warning(
-                f"Screenshot '{label}' not at expected path {output_path.name}. "
+                f"Before screenshot not at expected path {output_path.name}. "
                 f"Cline saved '{best.name}' instead — renaming to {output_path.name}."
             )
             best.rename(output_path)
         else:
             logger.warning(
-                f"Screenshot '{label}' was not created at {output_path}. "
+                f"Before screenshot was not created at {output_path}. "
                 f"Cline may not have saved the file. Continuing without screenshot."
             )
             return None
 
     file_size = output_path.stat().st_size
     if file_size == 0:
-        logger.warning(f"Screenshot '{label}' at {output_path} is empty (0 bytes).")
+        logger.warning(f"Before screenshot at {output_path} is empty (0 bytes).")
         return None
 
-    logger.info(f"Screenshot '{label}' saved: {output_path} ({file_size} bytes)")
+    logger.info(f"Before screenshot saved: {output_path} ({file_size} bytes)")
     return output_path
 
 
