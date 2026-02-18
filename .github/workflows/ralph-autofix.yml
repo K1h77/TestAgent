@@ -55,10 +55,20 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
-      - name: Install Cline CLI and authenticate
+      - name: Install Cline CLI and configure
         run: |
           npm install -g cline@latest
-          cline auth --provider openrouter --apikey "$OPENROUTER_API_KEY"
+          mkdir -p ~/.cline/data
+          cat > ~/.cline/data/globalState.json << 'CONF'
+          {
+            "welcomeViewCompleted": true,
+            "actModeApiProvider": "openrouter",
+            "actModeApiModelId": "minimax/minimax-m2.5",
+            "planModeApiProvider": "openrouter",
+            "planModeApiModelId": "minimax/minimax-m2.5"
+          }
+          CONF
+          echo "{\"apiKey\": \"$OPENROUTER_API_KEY\"}" > ~/.cline/data/secrets.json
 
       - name: Install Playwright MCP server and browsers
         run: |
