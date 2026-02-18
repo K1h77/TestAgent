@@ -57,8 +57,8 @@ jobs:
 
       - name: Install Cline CLI and authenticate
         run: |
-          npm install -g cline
-          cline auth -p openrouter -k "$OPENROUTER_API_KEY"
+          npm install -g cline@latest
+          cline auth --provider openrouter --apikey "$OPENROUTER_API_KEY"
 
       - name: Install Playwright MCP server and browsers
         run: |
