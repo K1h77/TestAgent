@@ -11,7 +11,6 @@ from lib.screenshot import (
     take_screenshot,
     embed_screenshots_markdown,
     _to_relative_path,
-    BEFORE_SCREENSHOT_PROMPT_TEMPLATE,
 )
 from lib.cline_runner import ClineError
 

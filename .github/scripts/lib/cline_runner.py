@@ -206,7 +206,6 @@ class ClineRunner:
         cmd = [
             "cline",
             "-y",
-            "--model", self.model,
             "--timeout", str(timeout),
         ]
 
@@ -219,7 +218,7 @@ class ClineRunner:
         env["CLINE_DIR"] = str(self.cline_dir)
         env["CLINE_COMMAND_PERMISSIONS"] = json.dumps(self.command_permissions)
 
-        logger.info(f"Running Cline (model={self.model}, timeout={timeout}s)")
+        logger.info(f"Running Cline (act={self.model}, plan={self.plan_model}, timeout={timeout}s)")
         logger.debug(f"CLINE_DIR={self.cline_dir}")
         logger.debug(f"Prompt length: {len(prompt)} chars")
 

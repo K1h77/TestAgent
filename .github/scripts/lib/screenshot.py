@@ -11,76 +11,22 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
+
 
 class ScreenshotError(Exception):
     """Raised when screenshot capture fails."""
     pass
 
 
-BEFORE_SCREENSHOT_PROMPT_TEMPLATE = (
-    "Using the Playwright MCP server ONLY (do NOT read files or run shell commands), "
-    "take a BEFORE screenshot of the app as it currently exists.\n"
-    "\n"
-    "Issue #{issue_number}: {issue_title}\n"
-    "Description: {issue_body}\n"
-    "\n"
-    "Steps:\n"
-    "1. Launch a browser and navigate to http://localhost:3000\n"
-    "2. If a login form is present, log in with username 'testuser' and password 'password'\n"
-    "3. Using the app's own navigation (links, buttons, menus), navigate to the page or section "
-    "where the feature described in the issue will likely be added. "
-    "This feature does NOT exist yet — do not search for it or try to interact with it. "
-    "Just get to the right area of the app.\n"
-    "4. Once on the relevant page, immediately use the Playwright MCP screenshot tool to take a "
-    "full-page screenshot and save it to: {output_path}\n"
-    "\n"
-    "CRITICAL: This is a BEFORE screenshot. The feature has NOT been implemented yet. "
-    "If you cannot find a UI element related to the issue, that is expected — just take the "
-    "screenshot of the current page and stop. Do NOT spend time searching or retrying. "
-    "Use only Playwright MCP tools. Do not run npm, cat, ls, or any shell commands."
-)
-
-AFTER_SCREENSHOT_REVIEW_PROMPT_TEMPLATE = (
-    "Using the Playwright MCP server ONLY (do NOT read files or run shell commands), "
-    "do a thorough visual QA for GitHub issue #{issue_number}: {issue_title}\n"
-    "Issue description: {issue_body}\n"
-    "\n"
-    "## Step 1 — Explore and capture screenshots\n"
-    "1. Launch a browser and navigate to http://localhost:3000\n"
-    "2. If a login form is present, log in with username 'testuser' and password 'password'\n"
-    "3. Explore the app thoroughly to verify the feature described in the issue. "
-    "Take as many screenshots as you need to check:\n"
-    "   - The feature in its default/idle state\n"
-    "   - The feature after interaction (e.g. toggle activated, modal open, state changed)\n"
-    "   - Any other relevant pages or states that help confirm the fix is complete\n"
-    "   Save each screenshot to the directory: {screenshots_dir}\n"
-    "   Name them sequentially: after_01.png, after_02.png, after_03.png, etc.\n"
-    "\n"
-    "## Step 2 — Visual QA review\n"
-    "Review all the screenshots you took and assess:\n"
-    "- Is the feature described in the issue clearly visible and working?\n"
-    "- Are there any obvious visual glitches? (broken layout, overlapping elements, "
-    "blank/white page, missing content, severe CSS issues, console errors visible on screen)\n"
-    "\n"
-    "Be lenient — only flag clear, obvious problems. Minor styling differences are fine.\n"
-    "\n"
-    "## Step 3 — Write verdict and selected screenshots to file\n"
-    "Write results to: {verdict_path}\n"
-    "The file must contain:\n"
-    "  Line 1: exactly one verdict:\n"
-    "    VISUAL: OK\n"
-    "    VISUAL: FEATURE_NOT_FOUND - <what you expected to see but didn't>\n"
-    "    VISUAL: ISSUE - <brief description of the glitch or problem>\n"
-    "  Line 2: SELECTED: <comma-separated list of the screenshot filenames that best show the result>\n"
-    "    Choose only the most informative ones (1-3 is ideal). Example:\n"
-    "    SELECTED: after_01.png, after_02.png\n"
-    "\n"
-    "Example file contents:\n"
-    "  VISUAL: OK\n"
-    "  SELECTED: after_01.png, after_02.png\n"
-    "\n"
-    "IMPORTANT: Use only Playwright MCP tools. Do not run npm, cat, ls, or any shell commands."
-)
+def _load_prompt(name: str, **kwargs: str) -> str:
+    path = PROMPTS_DIR / name
+    if not path.exists():
+        raise FileNotFoundError(f"Screenshot prompt template not found: {path}")
+    content = path.read_text(encoding="utf-8")
+    for key, value in kwargs.items():
+        content = content.replace(f"{{{{{key}}}}}", str(value))
+    return content
 
 
 def take_screenshot(
@@ -94,11 +40,12 @@ def take_screenshot(
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    prompt = BEFORE_SCREENSHOT_PROMPT_TEMPLATE.format(
-        output_path=str(output_path),
-        issue_number=issue_number,
-        issue_title=issue_title,
-        issue_body=issue_body[:2000],
+    prompt = _load_prompt(
+        "screenshot_before_prompt.md",
+        OUTPUT_PATH=str(output_path),
+        ISSUE_NUMBER=str(issue_number),
+        ISSUE_TITLE=issue_title,
+        ISSUE_BODY=issue_body[:2000],
     )
 
     logger.info(f"Taking 'before' screenshot → {output_path}")
@@ -198,24 +145,26 @@ def take_after_screenshot_with_review(
     screenshots_dir.mkdir(parents=True, exist_ok=True)
     verdict_path = screenshots_dir / "visual_verdict.txt"
 
-    prompt = AFTER_SCREENSHOT_REVIEW_PROMPT_TEMPLATE.format(
-        screenshots_dir=str(screenshots_dir),
-        verdict_path=str(verdict_path),
-        issue_number=issue_number,
-        issue_title=issue_title,
-        issue_body=issue_body[:2000],
+    prompt = _load_prompt(
+        "screenshot_after_prompt.md",
+        SCREENSHOTS_DIR=str(screenshots_dir),
+        VERDICT_PATH=str(verdict_path),
+        ISSUE_NUMBER=str(issue_number),
+        ISSUE_TITLE=issue_title,
+        ISSUE_BODY=issue_body[:2000],
     )
 
     logger.info(f"Taking 'after' screenshots + visual review → {screenshots_dir}")
 
+    cline_error: Optional[Exception] = None
     try:
         cline_runner.run(prompt, timeout=timeout)
     except Exception as e:
+        cline_error = e
         logger.warning(
-            f"After screenshot/review failed (non-blocking): {e}. "
-            f"Continuing without screenshot."
+            f"After screenshot/review Cline exited with error (non-blocking): {e}. "
+            f"Will still recover any screenshots saved before the crash."
         )
-        return [], None
 
     # Parse the SELECTED: line from the verdict file to get the chosen screenshots
     selected_paths: list[Path] = []
@@ -253,6 +202,11 @@ def take_after_screenshot_with_review(
             )
 
     logger.info(f"After screenshots selected: {[p.name for p in selected_paths]}")
+
+    if cline_error and not selected_paths:
+        logger.warning("Cline errored and no screenshots were recovered. Continuing without.")
+        return [], None
+
     return selected_paths, result_verdict
 
 
