@@ -228,7 +228,7 @@ def main() -> None:
     )
     vision_cline = ClineRunner(
         cline_dir=REPO_ROOT / ".cline-vision",
-        model="google/gemini-3-flash-preview",
+        model="qwen/qwen3-vl-30b-a3b-instruct",
         mcp_settings_path=MCP_SETTINGS_PATH,
     )
 
