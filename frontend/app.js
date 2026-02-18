@@ -1,5 +1,20 @@
 const API_URL = 'http://localhost:3000/api';
 
+// Loading indicator helper functions
+function showLoading() {
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    if (loadingIndicator) {
+        loadingIndicator.style.display = 'block';
+    }
+}
+
+function hideLoading() {
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    if (loadingIndicator) {
+        loadingIndicator.style.display = 'none';
+    }
+}
+
 // Handle login and show main UI
 document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('loginForm');
@@ -21,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Load all tasks from the API
 async function loadTasks() {
+    showLoading();
     try {
         const response = await fetch(`${API_URL}/tasks`);
         const tasks = await response.json();
@@ -28,6 +44,8 @@ async function loadTasks() {
     } catch (error) {
         console.error('Error loading tasks:', error);
         alert('Failed to load tasks. Make sure the backend server is running on port 3000.');
+    } finally {
+        hideLoading();
     }
 }
 
@@ -68,6 +86,7 @@ async function addTask() {
         return;
     }
     
+    showLoading();
     try {
         const response = await fetch(`${API_URL}/tasks`, {
             method: 'POST',
@@ -82,9 +101,11 @@ async function addTask() {
             descriptionInput.value = '';
             loadTasks();
         } else {
+            hideLoading();
             alert('Failed to add task');
         }
     } catch (error) {
+        hideLoading();
         console.error('Error adding task:', error);
         alert('Failed to add task. Make sure the backend server is running.');
     }
@@ -92,6 +113,7 @@ async function addTask() {
 
 // Toggle task completion status
 async function toggleTask(id, completed) {
+    showLoading();
     try {
         const response = await fetch(`${API_URL}/tasks/${id}`, {
             method: 'PUT',
@@ -104,9 +126,11 @@ async function toggleTask(id, completed) {
         if (response.ok) {
             loadTasks();
         } else {
+            hideLoading();
             alert('Failed to update task');
         }
     } catch (error) {
+        hideLoading();
         console.error('Error updating task:', error);
         alert('Failed to update task. Make sure the backend server is running.');
     }
@@ -118,6 +142,7 @@ async function deleteTask(id) {
         return;
     }
     
+    showLoading();
     try {
         const response = await fetch(`${API_URL}/tasks/${id}`, {
             method: 'DELETE'
@@ -126,9 +151,11 @@ async function deleteTask(id) {
         if (response.ok) {
             loadTasks();
         } else {
+            hideLoading();
             alert('Failed to delete task');
         }
     } catch (error) {
+        hideLoading();
         console.error('Error deleting task:', error);
         alert('Failed to delete task. Make sure the backend server is running.');
     }
