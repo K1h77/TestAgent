@@ -70,7 +70,20 @@ jobs:
             echo "::error::OPENROUTER_API_KEY secret is not set. Configure it in Settings > Secrets."
             exit 1
           fi
-          echo "All required secrets are configured."
+
+          # Verify the key is actually accepted by OpenRouter (catches wrong/expired keys early)
+          HTTP_STATUS=$(curl -s -o /tmp/or_key_check.json -w "%{http_code}" \
+            -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+            https://openrouter.ai/api/v1/key)
+
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "::error::OPENROUTER_API_KEY is set but rejected by OpenRouter (HTTP $HTTP_STATUS)."
+            echo "Response: $(cat /tmp/or_key_check.json)"
+            echo "Check that the key is correct and has not expired: https://openrouter.ai/keys"
+            exit 1
+          fi
+
+          echo "OPENROUTER_API_KEY validated successfully (HTTP 200)."
 
       # ── Run agent Python tests ────────────────────────────────
       - name: Run agent unit tests
