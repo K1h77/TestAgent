@@ -10,8 +10,9 @@ models:
   # Planner for all other issues. DeepSeek V3.2 = score 42, US-hosted (DeepInfra/AtlasCloud),
   # $0.38/M output, non-thinking by default → no Cline reasoning-token echo issues.
   planner_default: "deepseek/deepseek-v3.2"
-  # Multimodal model used for before/after screenshots and visual QA
-  vision: "qwen/qwen3-vl-30b-a3b-instruct"
+  # Multimodal model used for before/after screenshots and visual QA.
+  # Haiku 4.5: native Cline support, strong vision + tool use, $1/$5/M (~$0.06 at 50k tokens).
+  vision: "anthropic/claude-haiku-4.5"
   # Model used by the self-review Cline instance (read-only reviewer)
   reviewer: "deepseek/deepseek-v3.2"
   # Model used to apply reviewer feedback fixes
