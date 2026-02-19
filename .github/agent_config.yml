@@ -3,14 +3,17 @@
 # All values here are read at runtime by ralph_agent.py and self_review.py.
 
 models:
-  # Cline model used for the main TDD coding loop
-  coding: "deepseek/deepseek-v3.2"
-  # Plan-mode model for the coding Cline instance (used for planning before acting)
-  coding_plan: "minimax/minimax-m2.5"
+  # Coder for all attempts. DeepSeek V3.2 handles Jest/Playwright mechanically at ~$0.30/M.
+  coder: "deepseek/deepseek-v3.2"
+  # Planner for issues labelled "hard". Sonnet 4.6 = score 44, first-class Cline support.
+  planner_hard: "anthropic/claude-sonnet-4.6"
+  # Planner for all other issues. DeepSeek V3.2 = score 42, US-hosted (DeepInfra/AtlasCloud),
+  # $0.38/M output, non-thinking by default → no Cline reasoning-token echo issues.
+  planner_default: "deepseek/deepseek-v3.2"
   # Multimodal model used for before/after screenshots and visual QA
   vision: "qwen/qwen3-vl-30b-a3b-instruct"
   # Model used by the self-review Cline instance (read-only reviewer)
-  reviewer: "minimax/minimax-m2.5"
+  reviewer: "deepseek/deepseek-v3.2"
   # Model used to apply reviewer feedback fixes
   fixer: "deepseek/deepseek-v3.2"
 

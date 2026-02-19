@@ -7,9 +7,11 @@ Usage:
     from lib.agent_config import load_config
 
     cfg = load_config()
-    cfg.models.coding          # "deepseek/deepseek-v3.2"
-    cfg.retries.max_coding_attempts  # 3
-    cfg.timeouts.coding_seconds      # 1800
+    cfg.models.coder          # "deepseek/deepseek-v3.2"
+    cfg.models.planner_hard   # "anthropic/claude-sonnet-4.6"  (issues labelled "hard")
+    cfg.models.planner_default # "deepseek/deepseek-v3.2"      (all other issues)
+    cfg.retries.max_coding_attempts    # 3
+    cfg.timeouts.coding_seconds        # 1800
 """
 
 import logging
@@ -27,8 +29,9 @@ _CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "agent_config.yml
 
 @dataclass(frozen=True)
 class Models:
-    coding: str
-    coding_plan: str
+    coder: str          # OpenRouter model ID for the coding Cline instance (all attempts)
+    planner_hard: str   # Planner for issues labelled "hard" (e.g. Claude Sonnet 4.6)
+    planner_default: str # Planner for all other issues (e.g. DeepSeek V3.2)
     vision: str
     reviewer: str
     fixer: str
@@ -87,8 +90,9 @@ def load_config(config_path: Path = _CONFIG_PATH) -> AgentConfig:
 
     try:
         models = Models(
-            coding=str(raw["models"]["coding"]),
-            coding_plan=str(raw["models"]["coding_plan"]),
+            coder=str(raw["models"]["coder"]),
+            planner_hard=str(raw["models"]["planner_hard"]),
+            planner_default=str(raw["models"]["planner_default"]),
             vision=str(raw["models"]["vision"]),
             reviewer=str(raw["models"]["reviewer"]),
             fixer=str(raw["models"]["fixer"]),

@@ -256,12 +256,20 @@ def main() -> None:
         logger.warning(f"Failed to post start comment (non-blocking): {e}")
 
     # ── 5. Configure Cline runners ──────────────────────────────
-    coding_cline = ClineRunner(
-        cline_dir=REPO_ROOT / ".cline-agent",
-        model=_cfg.models.coding,
-        plan_model=_cfg.models.coding_plan,
-        # No MCP settings — coding agent uses CLI tools only (npm, git, etc.).
-        # Playwright MCP is only for vision_cline (Qwen VL) which can handle image inputs.
+    # Two runners: one with the default planner (DeepSeek V3.2) for early attempts,
+    # one with Sonnet 4.6 for the final attempt (or all attempts on "hard" tickets).
+    # Separate cline_dirs prevent state from bleeding between the two.
+    is_hard = "hard" in issue.labels
+    logger.info(f"Issue is hard: {is_hard}")
+    default_cline = ClineRunner(
+        cline_dir=REPO_ROOT / ".cline-agent-default",
+        model=_cfg.models.coder,
+        plan_model=_cfg.models.planner_default,
+    )
+    sonnet_cline = ClineRunner(
+        cline_dir=REPO_ROOT / ".cline-agent-sonnet",
+        model=_cfg.models.coder,
+        plan_model=_cfg.models.planner_hard,
     )
     vision_cline = ClineRunner(
         cline_dir=REPO_ROOT / ".cline-vision",
@@ -300,7 +308,18 @@ def main() -> None:
 
         for attempt in range(1, MAX_CODING_ATTEMPTS + 1):
             coding_attempts = attempt
-            logger.info(f"--- Coding attempt {attempt}/{MAX_CODING_ATTEMPTS} ---")
+            is_final = attempt == MAX_CODING_ATTEMPTS
+            # Hard tickets always use Sonnet. Non-hard tickets use Sonnet only on the
+            # final attempt so early cheap attempts still run first.
+            use_sonnet = is_hard or is_final
+            coding_cline = sonnet_cline if use_sonnet else default_cline
+            active_planner = _cfg.models.planner_hard if use_sonnet else _cfg.models.planner_default
+            logger.info(
+                f"--- Coding attempt {attempt}/{MAX_CODING_ATTEMPTS} "
+                f"[planner: {active_planner} | coder: {_cfg.models.coder}]"
+                f"{' (SONNET — final attempt)' if use_sonnet and not is_hard else ''}"
+                f"{' (SONNET — hard ticket)' if is_hard else ''} ---"
+            )
 
             if attempt == 1:
                 # First attempt: fresh TDD prompt
@@ -312,7 +331,9 @@ def main() -> None:
                     SCREENSHOTS_DIR=str(SCREENSHOTS_DIR),
                 )
             else:
-                # Subsequent attempts: check progress, build continuation prompt
+                # Subsequent attempts: escalated tier — treat prior work as an external
+                # artifact so the smarter model audits it independently rather than
+                # anchoring to a broken approach it thinks it authored.
                 diff = get_git_diff()
                 test_ok, test_output = run_tests()
 
@@ -321,9 +342,9 @@ def main() -> None:
                     logger.info(f"Tests passed on attempt {attempt} (before running Cline)")
                     break
 
-                logger.info(f"Progress so far: {len(diff)} chars of diff")
+                logger.info(f"Prior diff to audit: {len(diff)} chars")
                 prompt = load_prompt_template(
-                    "continue_prompt.md",
+                    "escalate_prompt.md",
                     ISSUE_NUMBER=str(issue.number),
                     ISSUE_TITLE=issue.title,
                     ISSUE_BODY=issue.body,
