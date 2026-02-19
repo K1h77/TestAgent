@@ -5,13 +5,44 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('loginForm');
     const loginContainer = document.getElementById('loginContainer');
     const mainContainer = document.getElementById('mainContainer');
+    const loginError = document.getElementById('loginError');
     
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        // Mock login - any credentials work
-        loginContainer.style.display = 'none';
-        mainContainer.style.display = 'block';
-        loadTasks();
+        
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        
+        // Hide any previous error
+        loginError.style.display = 'none';
+        loginError.textContent = '';
+        
+        try {
+            const response = await fetch(`${API_URL}/login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, password })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok && data.success) {
+                // Login successful
+                loginContainer.style.display = 'none';
+                mainContainer.style.display = 'block';
+                loadTasks();
+            } else {
+                // Login failed
+                loginError.textContent = data.message || 'Login failed. Please try again.';
+                loginError.style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            loginError.textContent = 'Network error. Please check your connection and try again.';
+            loginError.style.display = 'block';
+        }
     });
     
     // Show login form initially
