@@ -7,9 +7,10 @@ Usage:
     from lib.agent_config import load_config
 
     cfg = load_config()
-    cfg.models.coder          # "deepseek/deepseek-v3.2"
-    cfg.models.planner_hard   # "anthropic/claude-sonnet-4.6"  (issues labelled "hard")
-    cfg.models.planner_default # "deepseek/deepseek-v3.2"      (all other issues)
+    cfg.models.coder_default   # "deepseek/deepseek-v3.2"    (default coder)
+    cfg.models.coder_hard      # "minimax/minimax-m2.5"      (hard tickets + final attempt)
+    cfg.models.planner_hard    # "z-ai/glm-5"               (issues labelled "hard")
+    cfg.models.planner_default # "deepseek/deepseek-v3.2"   (all other issues)
     cfg.retries.max_coding_attempts    # 3
     cfg.timeouts.coding_seconds        # 1800
 """
@@ -29,8 +30,9 @@ _CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "agent_config.yml
 
 @dataclass(frozen=True)
 class Models:
-    coder: str          # OpenRouter model ID for the coding Cline instance (all attempts)
-    planner_hard: str   # Planner for issues labelled "hard" (e.g. Claude Sonnet 4.6)
+    coder_default: str   # Coder for non-hard tickets and early attempts (e.g. DeepSeek V3.2)
+    coder_hard: str      # Coder for hard tickets + final attempt (e.g. MiniMax M2.5)
+    planner_hard: str    # Planner for issues labelled "hard" (e.g. GLM-5)
     planner_default: str # Planner for all other issues (e.g. DeepSeek V3.2)
     vision: str
     reviewer: str
@@ -90,7 +92,8 @@ def load_config(config_path: Path = _CONFIG_PATH) -> AgentConfig:
 
     try:
         models = Models(
-            coder=str(raw["models"]["coder"]),
+            coder_default=str(raw["models"]["coder_default"]),
+            coder_hard=str(raw["models"]["coder_hard"]),
             planner_hard=str(raw["models"]["planner_hard"]),
             planner_default=str(raw["models"]["planner_default"]),
             vision=str(raw["models"]["vision"]),

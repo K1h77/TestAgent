@@ -1,39 +1,52 @@
-# Ralph Agent — Central Configuration
-# Edit this file to change models, retry counts, and timeouts.
-# All values here are read at runtime by ralph_agent.py and self_review.py.
-
 models:
-  # Coder for all attempts. DeepSeek V3.2 handles Jest/Playwright mechanically at ~$0.30/M.
-  coder: "deepseek/deepseek-v3.2"
-  # Planner for issues labelled "hard". Sonnet 4.6 = score 44, first-class Cline support.
-  planner_hard: "anthropic/claude-sonnet-4.6"
-  # Planner for all other issues. DeepSeek V3.2 = score 42, US-hosted (DeepInfra/AtlasCloud),
-  # $0.38/M output, non-thinking by default → no Cline reasoning-token echo issues.
+  # Default coder (non-hard tickets and early attempts). DeepSeek V3.2 ~$0.38/M output.
+  coder_default: "deepseek/deepseek-v3.2"
+
+  # Hard coder (hard tickets + final attempt). MiniMax M2.5: SWE-bench 80.2%, agentic #1,
+  # $1.10/M output, 176B Cline tokens in production, US/EU hosted (Parasail/Inceptron SE).
+  coder_hard: "minimax/minimax-m2.5"
+
+  # Planner for hard tickets. GLM-5: score 49.6 (#1 open-source), $3.20/M output,
+  # MIT license, US-hosted (AtlasCloud/Friendli/Parasail), 35B Cline tokens.
+  planner_hard: "z-ai/glm-5"
+
+  # Planner for all other issues. DeepSeek V3.2: score 42, $0.38/M output, US-hosted,
+  # non-thinking by default → no Cline reasoning-token echo issues.
   planner_default: "deepseek/deepseek-v3.2"
+
   # Multimodal model used for before/after screenshots and visual QA.
   # Haiku 4.5: native Cline support, strong vision + tool use, $1/$5/M (~$0.06 at 50k tokens).
   vision: "anthropic/claude-haiku-4.5"
-  # Model used by the self-review Cline instance (read-only reviewer)
-  reviewer: "deepseek/deepseek-v3.2"
+
+  # Model used by the self-review Cline instance (read-only reviewer).
+  # GLM-5: score 49.6, best open-source reasoning — catches what cheaper models miss.
+  reviewer: "z-ai/glm-5"
+
   # Model used to apply reviewer feedback fixes
   fixer: "deepseek/deepseek-v3.2"
 
 retries:
   # Maximum number of full coding attempts before giving up and creating the PR anyway
   max_coding_attempts: 3
+
   # Maximum number of review → fix → re-review cycles in self_review.py
   max_review_iterations: 3
+
   # Maximum test-fix attempts in the self-heal loop (called after each review fix)
   max_heal_attempts: 3
 
 timeouts:
   # Seconds allowed per Cline coding attempt (30 min)
   coding_seconds: 1800
+
   # Seconds allowed for each review pass (10 min)
   review_seconds: 600
+
   # Seconds allowed for each review-fix pass (10 min)
   fix_seconds: 600
+
   # Seconds allowed for screenshot + visual QA (10 min)
   screenshot_seconds: 600
+
   # Seconds allowed for `npm test` runs (2 min)
   test_seconds: 120

@@ -1,26 +1,24 @@
 #!/usr/bin/env python3
-"""Ralph Agent — Main orchestration script.
-
-Reads a GitHub issue, creates a branch, runs Cline in TDD mode,
-self-heals failing tests, takes before/after screenshots, and creates a PR.
-
-All failures are explicit. Nothing proceeds silently with missing data.
-"""
-
 import logging
 import os
 import re
-import signal
-import subprocess
 import sys
 import time
 from pathlib import Path
 
-# Add parent directory to path so lib/ is importable
 sys.path.insert(0, str(Path(__file__).parent))
 
 from lib.agent_config import load_config
 from lib.cline_runner import ClineRunner, ClineError, get_openrouter_usage
+from lib.utils import (
+    get_git_diff,
+    get_frontend_diff,
+    get_repo_name,
+    load_prompt_template,
+    run_tests,
+    start_server,
+    stop_server,
+)
 from lib.git_ops import (
     configure_git_user,
     create_branch,
@@ -30,200 +28,24 @@ from lib.git_ops import (
     post_issue_comment,
     GitError,
 )
-from lib.issue_parser import Issue, parse_issue, require_env
+from lib.issue_parser import parse_issue, require_env
 from lib.logging_config import setup_logging, format_summary
-from lib.screenshot import take_screenshot, take_after_screenshot_with_review, embed_screenshots_markdown
+from lib.screenshot import take_after_screenshot_with_review, embed_screenshots_markdown
 
 logger = logging.getLogger("ralph-agent")
 
-# Constants
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 SCRIPTS_DIR = Path(__file__).resolve().parent
 MCP_SETTINGS_PATH = SCRIPTS_DIR / "cline-config" / "cline_mcp_settings.json"
 PROMPTS_DIR = SCRIPTS_DIR / "prompts"
 SCREENSHOTS_DIR = REPO_ROOT / "screenshots"
 
-# Load central config from .github/agent_config.yml
 _cfg = load_config()
 MAX_CODING_ATTEMPTS = _cfg.retries.max_coding_attempts
 CODING_TIMEOUT = _cfg.timeouts.coding_seconds
 
 
-def load_prompt_template(name: str, **kwargs: str) -> str:
-    path = PROMPTS_DIR / name
-    if not path.exists():
-        raise FileNotFoundError(f"Prompt template not found: {path}")
-
-    content = path.read_text(encoding="utf-8")
-    for key, value in kwargs.items():
-        content = content.replace(f"{{{{{key}}}}}", str(value))
-
-    return content
-
-
-def start_server() -> subprocess.Popen:
-    logger.info("Starting backend server...")
-
-    # Install backend deps first (use ci for reproducible installs)
-    subprocess.run(
-        ["npm", "ci"],
-        cwd=str(REPO_ROOT / "backend"),
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-
-    proc = subprocess.Popen(
-        ["node", "server.js"],
-        cwd=str(REPO_ROOT / "backend"),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-
-    # Wait for server readiness
-    for i in range(30):
-        try:
-            result = subprocess.run(
-                ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "http://localhost:3000/"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if result.stdout.strip() == "200":
-                logger.info("Backend server is ready")
-                return proc
-        except (subprocess.TimeoutExpired, Exception):
-            pass
-        time.sleep(1)
-
-    proc.kill()
-    raise RuntimeError(
-        "Backend server failed to start within 30 seconds. "
-        "Check backend/server.js for errors."
-    )
-
-
-def stop_server(proc: subprocess.Popen) -> None:
-    if proc and proc.poll() is None:
-        proc.terminate()
-        try:
-            proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-        logger.info("Backend server stopped")
-
-
-def run_tests() -> tuple[bool, str]:
-    logger.info("Running tests...")
-
-    try:
-        result = subprocess.run(
-            ["npm", "test"],
-            cwd=str(REPO_ROOT),
-            capture_output=True,
-            text=True,
-            timeout=_cfg.timeouts.test_seconds,
-        )
-    except subprocess.TimeoutExpired:
-        logger.warning(f"Tests timed out after {_cfg.timeouts.test_seconds}s")
-        return False, f"Tests timed out after {_cfg.timeouts.test_seconds}s"
-
-    output = result.stdout + "\n" + result.stderr
-    success = result.returncode == 0
-
-    if success:
-        logger.info("Tests passed")
-    else:
-        logger.warning(f"Tests failed (exit {result.returncode})")
-        logger.debug(f"Test output:\n{output}")
-
-    return success, output
-
-
-def get_git_diff() -> str:
-    """Return the current uncommitted diff (truncated for prompt use)."""
-    result = subprocess.run(
-        ["git", "diff", "HEAD"],
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    diff = result.stdout.strip()
-    if not diff:
-        # Also check untracked files
-        result = subprocess.run(
-            ["git", "status", "--short"],
-            cwd=str(REPO_ROOT),
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        diff = result.stdout.strip()
-    return diff[:5000]
-
-
-_FRONTEND_EXTENSIONS = {".html", ".css", ".js", ".jsx", ".ts", ".tsx", ".vue", ".svelte"}
-
-
-def get_frontend_diff() -> str:
-    """Return the committed diff filtered to frontend file types only."""
-    result = subprocess.run(
-        ["git", "diff", "main..HEAD", "--", "*.html", "*.css", "*.js", "*.jsx", "*.ts", "*.tsx", "*.vue", "*.svelte"],
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    diff = result.stdout.strip()
-    if not diff:
-        # Fall back to uncommitted changes
-        result = subprocess.run(
-            ["git", "diff", "HEAD", "--", "*.html", "*.css", "*.js", "*.jsx", "*.ts", "*.tsx", "*.vue", "*.svelte"],
-            cwd=str(REPO_ROOT),
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        diff = result.stdout.strip()
-    return diff
-
-
-def get_repo_name() -> str:
-    try:
-        result = subprocess.run(
-            ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        return result.stdout.strip()
-    except Exception:
-        # Fallback: parse from git remote
-        result = subprocess.run(
-            ["git", "remote", "get-url", "origin"],
-            capture_output=True,
-            text=True,
-        )
-        url = result.stdout.strip()
-        # Handle both https and ssh URLs
-        if url.endswith(".git"):
-            url = url[:-4]
-        parts = url.rstrip("/").split("/")
-        return f"{parts[-2]}/{parts[-1]}"
-
-
-def main() -> None:
-    setup_logging(verbose=True)
-
-    logger.info("=" * 60)
-    logger.info("Ralph Agent starting")
-    logger.info("=" * 60)
-
-    # Snapshot OpenRouter usage at start for total PR cost tracking
-    _cost_baseline = get_openrouter_usage()
-
-    # ── 1. Validate all inputs (fail-fast) ──────────────────────
+def validate_inputs():
     issue = parse_issue(
         number=require_env("ISSUE_NUMBER"),
         title=require_env("ISSUE_TITLE"),
@@ -236,17 +58,20 @@ def main() -> None:
     logger.info(f"Issue body: {issue.body[:200]}...")
     logger.info(f"Issue labels: {sorted(issue.labels) or '(none)'}")
     logger.info(f"Frontend checks enabled: {issue.is_frontend()}")
+    return issue
 
-    # ── 2. Configure git ────────────────────────────────────────
+
+def setup_git_branch(issue) -> str:
     configure_git_user()
 
-    # ── 3. Create branch ────────────────────────────────────────
     slug = re.sub(r"[^a-z0-9]+", "-", issue.title.lower()).strip("-")[:50].rstrip("-")
     desired_branch = f"ralph/issue-{issue.number}-{slug}"
-    branch = create_branch(desired_branch)  # Returns actual branch name (may have -v2, -v3, etc.)
+    branch = create_branch(desired_branch)
     logger.info(f"Branch created: {branch}")
+    return branch
 
-    # ── 4. Post "working on it" comment ─────────────────────────
+
+def post_start_comment(issue) -> None:
     try:
         post_issue_comment(
             issue.number,
@@ -255,145 +80,139 @@ def main() -> None:
     except GitError as e:
         logger.warning(f"Failed to post start comment (non-blocking): {e}")
 
-    # ── 5. Configure Cline runners ──────────────────────────────
-    # Two runners: one with the default planner (DeepSeek V3.2) for early attempts,
-    # one with Sonnet 4.6 for the final attempt (or all attempts on "hard" tickets).
-    # Separate cline_dirs prevent state from bleeding between the two.
+
+def configure_runners(issue):
     is_hard = "hard" in issue.labels
-    logger.info(f"Issue is hard: {is_hard}")
+    logger.info(f"Issue labelled hard: {is_hard}")
+
     default_cline = ClineRunner(
         cline_dir=REPO_ROOT / ".cline-agent-default",
-        model=_cfg.models.coder,
+        model=_cfg.models.coder_default,
         plan_model=_cfg.models.planner_default,
     )
-    sonnet_cline = ClineRunner(
-        cline_dir=REPO_ROOT / ".cline-agent-sonnet",
-        model=_cfg.models.coder,
+    hard_cline = ClineRunner(
+        cline_dir=REPO_ROOT / ".cline-agent-hard",
+        model=_cfg.models.coder_hard,
         plan_model=_cfg.models.planner_hard,
     )
-    vision_cline = ClineRunner(
-        cline_dir=REPO_ROOT / ".cline-vision",
-        model=_cfg.models.vision,
-        mcp_settings_path=MCP_SETTINGS_PATH,
-    ) if issue.is_frontend() else None
+    vision_cline = (
+        ClineRunner(
+            cline_dir=REPO_ROOT / ".cline-vision",
+            model=_cfg.models.vision,
+            mcp_settings_path=MCP_SETTINGS_PATH,
+        )
+        if issue.is_frontend()
+        else None
+    )
+    return is_hard, default_cline, hard_cline, vision_cline
 
-    # ── 6. Start backend server (frontend issues only) ──────────
-    server = start_server() if issue.is_frontend() else None
-    if not issue.is_frontend():
-        logger.info("Skipping server start and screenshots (not a frontend issue)")
 
-    # Initialize screenshot paths before try so they're always defined
-    before_path = None
+def start_server_if_frontend_issue(issue):
+    if issue.is_frontend():
+        return start_server(REPO_ROOT)
+    logger.info("Skipping server start and screenshots (not a frontend issue)")
+    return None
+
+
+def coding_loop(issue, is_hard, default_cline, hard_cline) -> tuple[bool, int]:
+    logger.info("=" * 40)
+    logger.info("CODING LOOP")
+    logger.info("=" * 40)
+
+    tests_passed = False
+    coding_attempts = 0
+
+    for attempt in range(1, MAX_CODING_ATTEMPTS + 1):
+        coding_attempts = attempt
+        is_final = attempt == MAX_CODING_ATTEMPTS
+
+        use_hard = is_hard or is_final
+        coding_cline = hard_cline if use_hard else default_cline
+        active_planner = _cfg.models.planner_hard if use_hard else _cfg.models.planner_default
+        active_coder = _cfg.models.coder_hard if use_hard else _cfg.models.coder_default
+        logger.info(
+            f"--- Coding attempt {attempt}/{MAX_CODING_ATTEMPTS} "
+            f"[planner: {active_planner} | coder: {active_coder}]"
+            + (" (hard runner — hard ticket)" if is_hard else "")
+            + (" (hard runner — final attempt)" if not is_hard and is_final else "")
+            + " ---"
+        )
+
+        if attempt == 1:
+            prompt = load_prompt_template(
+                PROMPTS_DIR,
+                "tdd_prompt.md",
+                ISSUE_NUMBER=str(issue.number),
+                ISSUE_TITLE=issue.title,
+                ISSUE_BODY=issue.body,
+                SCREENSHOTS_DIR=str(SCREENSHOTS_DIR),
+            )
+        else:
+            diff = get_git_diff(REPO_ROOT)
+            test_ok, test_output = run_tests(REPO_ROOT, _cfg.timeouts.test_seconds)
+
+            if test_ok:
+                tests_passed = True
+                logger.info(f"Tests passed on attempt {attempt} (before running Cline)")
+                break
+
+            logger.info(f"Prior diff to audit: {len(diff)} chars")
+            prompt = load_prompt_template(
+                PROMPTS_DIR,
+                "escalate_prompt.md",
+                ISSUE_NUMBER=str(issue.number),
+                ISSUE_TITLE=issue.title,
+                ISSUE_BODY=issue.body,
+                GIT_DIFF=diff,
+                TEST_OUTPUT=test_output[:3000],
+            )
+
+        try:
+            coding_cline.run(prompt, timeout=CODING_TIMEOUT, cwd=REPO_ROOT)
+        except ClineError as e:
+            logger.warning(f"Coding attempt {attempt} ended: {e}")
+            continue
+
+    if not tests_passed:
+        success, _ = run_tests(REPO_ROOT, _cfg.timeouts.test_seconds)
+        if success:
+            tests_passed = True
+            logger.info("Tests passed after final attempt")
+        else:
+            logger.warning(
+                f"Tests still failing after {coding_attempts} attempts. Proceeding with PR."
+            )
+
+    return tests_passed, coding_attempts
+
+
+def take_after_screenshots(issue, vision_cline, server):
     after_paths: list = []
 
-    try:
-        # ── 7. Before screenshot (frontend issues only) ─────────
-        if issue.is_frontend() and vision_cline is not None and server is not None:
-            before_path = take_screenshot(
-                vision_cline,
-                SCREENSHOTS_DIR / "before.png",
-                issue_number=issue.number,
-                issue_title=issue.title,
-                issue_body=issue.body,
-                timeout=_cfg.timeouts.screenshot_seconds,
-            )
+    if not (issue.is_frontend() and vision_cline is not None and server is not None):
+        return after_paths, server
 
-        # ── 8. Coding loop (TDD + retry with progress check) ─────
-        logger.info("=" * 40)
-        logger.info("CODING LOOP")
-        logger.info("=" * 40)
+    logger.info("Taking 'after' screenshots with visual review...")
+    stop_server(server)
+    time.sleep(2)
+    server = start_server(REPO_ROOT)
 
-        tests_passed = False
-        coding_attempts = 0
+    frontend_diff = get_frontend_diff(REPO_ROOT)
+    logger.info(f"Frontend diff for visual review: {len(frontend_diff)} chars")
 
-        for attempt in range(1, MAX_CODING_ATTEMPTS + 1):
-            coding_attempts = attempt
-            is_final = attempt == MAX_CODING_ATTEMPTS
-            # Hard tickets always use Sonnet. Non-hard tickets use Sonnet only on the
-            # final attempt so early cheap attempts still run first.
-            use_sonnet = is_hard or is_final
-            coding_cline = sonnet_cline if use_sonnet else default_cline
-            active_planner = _cfg.models.planner_hard if use_sonnet else _cfg.models.planner_default
-            logger.info(
-                f"--- Coding attempt {attempt}/{MAX_CODING_ATTEMPTS} "
-                f"[planner: {active_planner} | coder: {_cfg.models.coder}]"
-                f"{' (SONNET — final attempt)' if use_sonnet and not is_hard else ''}"
-                f"{' (SONNET — hard ticket)' if is_hard else ''} ---"
-            )
+    after_paths, _ = take_after_screenshot_with_review(
+        vision_cline,
+        SCREENSHOTS_DIR / "after.png",
+        issue_number=issue.number,
+        issue_title=issue.title,
+        issue_body=issue.body,
+        frontend_diff=frontend_diff,
+        timeout=_cfg.timeouts.screenshot_seconds,
+    )
+    return after_paths, server
 
-            if attempt == 1:
-                # First attempt: fresh TDD prompt
-                prompt = load_prompt_template(
-                    "tdd_prompt.md",
-                    ISSUE_NUMBER=str(issue.number),
-                    ISSUE_TITLE=issue.title,
-                    ISSUE_BODY=issue.body,
-                    SCREENSHOTS_DIR=str(SCREENSHOTS_DIR),
-                )
-            else:
-                # Subsequent attempts: escalated tier — treat prior work as an external
-                # artifact so the smarter model audits it independently rather than
-                # anchoring to a broken approach it thinks it authored.
-                diff = get_git_diff()
-                test_ok, test_output = run_tests()
 
-                if test_ok:
-                    tests_passed = True
-                    logger.info(f"Tests passed on attempt {attempt} (before running Cline)")
-                    break
-
-                logger.info(f"Prior diff to audit: {len(diff)} chars")
-                prompt = load_prompt_template(
-                    "escalate_prompt.md",
-                    ISSUE_NUMBER=str(issue.number),
-                    ISSUE_TITLE=issue.title,
-                    ISSUE_BODY=issue.body,
-                    GIT_DIFF=diff,
-                    TEST_OUTPUT=test_output[:3000],
-                )
-
-            try:
-                coding_cline.run(prompt, timeout=CODING_TIMEOUT, cwd=REPO_ROOT)
-            except ClineError as e:
-                logger.warning(f"Coding attempt {attempt} ended: {e}")
-                continue
-
-        # Final test check after last attempt
-        if not tests_passed:
-            success, _ = run_tests()
-            if success:
-                tests_passed = True
-                logger.info("Tests passed after final attempt")
-            else:
-                logger.warning(
-                    f"Tests still failing after {coding_attempts} attempts. Proceeding with PR."
-                )
-
-        # ── 10. After screenshot + inline visual review (frontend only) ──
-        if issue.is_frontend() and vision_cline is not None and server is not None:
-            logger.info("Taking 'after' screenshots with visual review...")
-            stop_server(server)
-            time.sleep(2)
-            server = start_server()
-
-            frontend_diff = get_frontend_diff()
-            logger.info(f"Frontend diff for visual review: {len(frontend_diff)} chars")
-
-            after_paths, _ = take_after_screenshot_with_review(
-                vision_cline,
-                SCREENSHOTS_DIR / "after.png",
-                issue_number=issue.number,
-                issue_title=issue.title,
-                issue_body=issue.body,
-                frontend_diff=frontend_diff,
-                timeout=_cfg.timeouts.screenshot_seconds,
-            )
-
-    finally:
-        if server is not None:
-            stop_server(server)
-
-    # ── 11. Commit and push ─────────────────────────────────────
+def commit_changes(issue, branch) -> None:
     logger.info("=" * 40)
     logger.info("COMMIT AND PUSH")
     logger.info("=" * 40)
@@ -415,15 +234,17 @@ def main() -> None:
         )
         raise RuntimeError(f"Commit/push failed: {error_msg}") from e
 
-    # ── 12. Create PR ───────────────────────────────────────────
+
+def build_and_create_pr(
+    issue, branch, tests_passed, coding_attempts, before_path, after_paths, cost_baseline
+) -> tuple[str, str]:
     repo_name = get_repo_name()
 
-    # Compute total token cost for this PR
-    _cost_final = get_openrouter_usage()
-    if _cost_final is not None and _cost_baseline is not None:
-        _total_cost = max(0.0, _cost_final - _cost_baseline)
-        cost_section = f"### Token Cost\n${_total_cost:.4f} USD (via OpenRouter)\n\n"
-        logger.info(f"Total PR cost: ${_total_cost:.4f} USD")
+    cost_final = get_openrouter_usage()
+    if cost_final is not None and cost_baseline is not None:
+        total_cost = max(0.0, cost_final - cost_baseline)
+        cost_section = f"### Token Cost\n${total_cost:.4f} USD (via OpenRouter)\n\n"
+        logger.info(f"Total PR cost: ${total_cost:.4f} USD")
     else:
         cost_section = ""
 
@@ -458,7 +279,6 @@ def main() -> None:
     pr_number = get_pr_number(pr_url)
     logger.info(f"PR created: {pr_url}")
 
-    # Write PR number for self-review step
     github_output = os.environ.get("GITHUB_OUTPUT")
     if github_output:
         with open(github_output, "a") as f:
@@ -467,7 +287,10 @@ def main() -> None:
             f.write(f"branch={branch}\n")
             f.flush()
 
-    # ── 13. Post summary on issue ───────────────────────────────
+    return pr_url, pr_number
+
+
+def post_completion_comment(issue, pr_url, tests_passed, coding_attempts) -> None:
     try:
         post_issue_comment(
             issue.number,
@@ -481,6 +304,37 @@ def main() -> None:
         )
     except GitError as e:
         logger.warning(f"Failed to post completion comment (non-blocking): {e}")
+
+
+def main() -> None:
+    setup_logging(verbose=True)
+    logger.info("=" * 60)
+    logger.info("Ralph Agent starting")
+    logger.info("=" * 60)
+
+    cost_baseline = get_openrouter_usage()
+
+    issue                                    = validate_inputs()
+    branch                                   = setup_git_branch(issue)
+    post_start_comment(issue)
+    is_hard, default_cline, hard_cline, vision_cline = configure_runners(issue)
+    server                                   = start_server_if_frontend_issue(issue)
+
+    before_path = None
+    after_paths: list = []
+
+    try:
+        tests_passed, coding_attempts = coding_loop(issue, is_hard, default_cline, hard_cline)
+        after_paths, server           = take_after_screenshots(issue, vision_cline, server)
+    finally:
+        if server is not None:
+            stop_server(server)
+
+    commit_changes(issue, branch)
+    pr_url, _ = build_and_create_pr(
+        issue, branch, tests_passed, coding_attempts, before_path, after_paths, cost_baseline
+    )
+    post_completion_comment(issue, pr_url, tests_passed, coding_attempts)
 
     logger.info("=" * 60)
     logger.info("Ralph Agent complete")
