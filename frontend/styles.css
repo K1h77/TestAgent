@@ -48,6 +48,17 @@ body {
     font-family: inherit;
 }
 
+.error-message {
+    color: #eb3349;
+    margin-bottom: 15px;
+    font-size: 14px;
+    padding: 10px;
+    background-color: #ffeaea;
+    border-radius: 5px;
+    border: 1px solid #ffcccc;
+    display: none;
+}
+
 .container {
     max-width: 800px;
     margin: 0 auto;

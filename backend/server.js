@@ -3,7 +3,7 @@ const cors = require('cors');
 const path = require('path');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
@@ -81,6 +81,44 @@ app.delete('/api/tasks/:id', (req, res) => {
   res.json({ message: 'Task deleted successfully' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+// Login endpoint
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body;
+  
+  // Validate required fields
+  if (!username || !password) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Username and password are required' 
+    });
+  }
+  
+  // Simple authentication - in a real app, this would check against a database
+  // For now, we'll accept 'testuser' with password 'testpass'
+  if (username === 'testuser' && password === 'testpass') {
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Login successful' 
+    });
+  }
+  
+  // Invalid credentials
+  return res.status(401).json({ 
+    success: false, 
+    message: 'Invalid credentials' 
+  });
 });
+
+// Health check endpoint for testing
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Only start the server if this file is run directly
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;

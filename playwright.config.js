@@ -6,14 +6,14 @@ module.exports = defineConfig({
   retries: 1,
   reporter: 'list',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://localhost:3001',
     headless: true,
     screenshot: 'only-on-failure',
   },
   webServer: {
-    command: 'cd backend && node server.js',
-    port: 3000,
-    reuseExistingServer: true,
-    timeout: 10000,
+    command: 'cd backend && PORT=3001 node server.js',
+    port: 3001,
+    reuseExistingServer: false,
+    timeout: 30000,
   },
 });
