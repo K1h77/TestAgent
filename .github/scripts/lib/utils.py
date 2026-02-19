@@ -6,7 +6,16 @@ from typing import Optional
 
 logger = logging.getLogger("ralph-agent")
 
-_FRONTEND_GLOBS = ["*.html", "*.css", "*.js", "*.jsx", "*.ts", "*.tsx", "*.vue", "*.svelte"]
+_FRONTEND_GLOBS = [
+    "*.html",
+    "*.css",
+    "*.js",
+    "*.jsx",
+    "*.ts",
+    "*.tsx",
+    "*.vue",
+    "*.svelte",
+]
 
 
 def start_server(repo_root: Path) -> subprocess.Popen:
@@ -30,7 +39,15 @@ def start_server(repo_root: Path) -> subprocess.Popen:
     for _ in range(30):
         try:
             result = subprocess.run(
-                ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "http://localhost:3000/"],
+                [
+                    "curl",
+                    "-s",
+                    "-o",
+                    "/dev/null",
+                    "-w",
+                    "%{http_code}",
+                    "http://localhost:3000/",
+                ],
                 capture_output=True,
                 text=True,
                 timeout=5,

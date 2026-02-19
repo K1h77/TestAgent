@@ -65,9 +65,7 @@ def parse_issue(number: str, title: str, body: str, labels: str = "") -> Issue:
     try:
         issue_number = int(number.strip())
     except (ValueError, TypeError):
-        raise ValueError(
-            f"Issue number must be a positive integer, got: '{number}'"
-        )
+        raise ValueError(f"Issue number must be a positive integer, got: '{number}'")
 
     if issue_number <= 0:
         raise ValueError(

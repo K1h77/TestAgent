@@ -1,7 +1,6 @@
 """Tests for cline_runner module."""
 
 import json
-import subprocess
 import pytest
 import sys
 from pathlib import Path
@@ -105,10 +104,14 @@ class TestClineRunnerInit:
 
         ClineRunner(cline_dir=cline_dir, model="model-v1")
         state_path = cline_dir / "data" / "globalState.json"
-        assert json.loads(state_path.read_text())["actModeOpenRouterModelId"] == "model-v1"
+        assert (
+            json.loads(state_path.read_text())["actModeOpenRouterModelId"] == "model-v1"
+        )
 
         ClineRunner(cline_dir=cline_dir, model="model-v2")
-        assert json.loads(state_path.read_text())["actModeOpenRouterModelId"] == "model-v2"
+        assert (
+            json.loads(state_path.read_text())["actModeOpenRouterModelId"] == "model-v2"
+        )
 
     @patch("shutil.which", return_value="/usr/bin/cline")
     def test_default_permissions(self, mock_which, tmp_path):
@@ -212,11 +215,12 @@ class TestClineRunnerRun:
         assert env["CLINE_DIR"] == str(cline_dir)
         assert "CLINE_COMMAND_PERMISSIONS" in env
 
-
     @patch("time.sleep")
     @patch("shutil.which", return_value="/usr/bin/cline")
     @patch("subprocess.Popen")
-    def test_plan_flag_added_when_separate_plan_model(self, mock_popen, mock_which, mock_sleep, tmp_path):
+    def test_plan_flag_added_when_separate_plan_model(
+        self, mock_popen, mock_which, mock_sleep, tmp_path
+    ):
         """When plan_model differs from model, -p flag must be passed so the planner is used."""
         mock_proc = MagicMock()
         mock_proc.poll.side_effect = [None, 0]
@@ -239,7 +243,9 @@ class TestClineRunnerRun:
     @patch("time.sleep")
     @patch("shutil.which", return_value="/usr/bin/cline")
     @patch("subprocess.Popen")
-    def test_plan_flag_absent_when_no_separate_plan_model(self, mock_popen, mock_which, mock_sleep, tmp_path):
+    def test_plan_flag_absent_when_no_separate_plan_model(
+        self, mock_popen, mock_which, mock_sleep, tmp_path
+    ):
         """When plan_model is not set (defaults to model), -p flag must NOT be added."""
         mock_proc = MagicMock()
         mock_proc.poll.side_effect = [None, 0]

@@ -8,9 +8,8 @@ in environments without the full dependency set installed).
 import re
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -26,7 +25,11 @@ def parse_verdict(review_output: str) -> str:
         line_stripped = line.strip().lower()
         if "verdict" in line_stripped and ":" in line_stripped:
             after_colon = line_stripped.split(":", 1)[1].strip()
-            if "needs changes" in after_colon or "needs_changes" in after_colon or "needs changes" in line_stripped:
+            if (
+                "needs changes" in after_colon
+                or "needs_changes" in after_colon
+                or "needs changes" in line_stripped
+            ):
                 return "NEEDS CHANGES"
             if "lgtm" in after_colon:
                 return "LGTM"
@@ -34,13 +37,14 @@ def parse_verdict(review_output: str) -> str:
     clean_lower = clean_output.lower()
     if "needs changes" in clean_lower or "needs_changes" in clean_lower:
         idx = clean_lower.find("needs changes")
-        if idx != -1 and "verdict" in clean_lower[max(0, idx - 100):idx + 50]:
+        if idx != -1 and "verdict" in clean_lower[max(0, idx - 100) : idx + 50]:
             return "NEEDS CHANGES"
 
     return "LGTM"
 
 
 # ── parse_verdict ────────────────────────────────────────────────────────────
+
 
 class TestParseVerdict:
     """Tests for parse_verdict()."""
@@ -80,7 +84,9 @@ class TestParseVerdict:
         assert parse_verdict("") == "LGTM"
 
     def test_needs_changes_beats_lgtm_when_only_needs_changes(self):
-        output = "Overall looks okay.\n\nVerdict: NEEDS CHANGES\n\nPlease fix the tests."
+        output = (
+            "Overall looks okay.\n\nVerdict: NEEDS CHANGES\n\nPlease fix the tests."
+        )
         assert parse_verdict(output) == "NEEDS CHANGES"
 
     def test_multiline_with_lgtm_verdict(self):
@@ -99,6 +105,7 @@ class TestParseVerdict:
 
 # ── Frontend-gating: visual verdict only read for frontend issues ─────────────
 
+
 class TestVisualVerdictGating:
     """
     Tests that the is_frontend() gate correctly controls whether
@@ -114,14 +121,19 @@ class TestVisualVerdictGating:
 
     def _frontend_issue(self):
         from lib.issue_parser import parse_issue
-        return parse_issue("1", "Fix button colour", "Button is wrong", labels="frontend")
+
+        return parse_issue(
+            "1", "Fix button colour", "Button is wrong", labels="frontend"
+        )
 
     def _backend_issue(self):
         from lib.issue_parser import parse_issue
+
         return parse_issue("2", "Fix API timeout", "Times out", labels="backend,bug")
 
     def _unlabelled_issue(self):
         from lib.issue_parser import parse_issue
+
         return parse_issue("3", "Some task", "Some description")
 
     def test_frontend_issue_reads_visual_verdict(self, tmp_path):
@@ -144,6 +156,7 @@ class TestVisualVerdictGating:
 
     def test_frontend_among_many_labels_still_triggers(self, tmp_path):
         from lib.issue_parser import parse_issue
+
         issue = parse_issue("4", "Title", "Body", labels="bug,frontend,ui")
         mock_rvv = MagicMock(return_value="OK")
         result = self._call_with_gate(issue, mock_rvv, tmp_path)
@@ -153,13 +166,16 @@ class TestVisualVerdictGating:
     def test_visual_section_omitted_when_verdict_none(self):
         """When visual_verdict is None the visual_section string should be empty."""
         visual_verdict = None
-        visual_section = f"\n\n### Visual QA\n{visual_verdict}" if visual_verdict else ""
+        visual_section = (
+            f"\n\n### Visual QA\n{visual_verdict}" if visual_verdict else ""
+        )
         assert visual_section == ""
 
     def test_visual_section_present_when_verdict_set(self):
         """When visual_verdict is a string the visual_section should contain it."""
         visual_verdict = "FEATURE_FOUND"
-        visual_section = f"\n\n### Visual QA\n{visual_verdict}" if visual_verdict else ""
+        visual_section = (
+            f"\n\n### Visual QA\n{visual_verdict}" if visual_verdict else ""
+        )
         assert "FEATURE_FOUND" in visual_section
         assert "Visual QA" in visual_section
-

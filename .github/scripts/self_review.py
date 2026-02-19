@@ -13,14 +13,18 @@ import logging
 import os
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 # Add parent directory to path so lib/ is importable
 sys.path.insert(0, str(Path(__file__).parent))
 
 from lib.agent_config import load_config
-from lib.cline_runner import ClineRunner, ClineError, READ_ONLY_PERMISSIONS, get_openrouter_usage
+from lib.cline_runner import (
+    ClineRunner,
+    ClineError,
+    READ_ONLY_PERMISSIONS,
+    get_openrouter_usage,
+)
 from lib.git_ops import (
     commit_and_push,
     get_diff,
@@ -74,6 +78,7 @@ def parse_verdict(review_output: str) -> str:
         is found (lenient — benefit of the doubt).
     """
     import re
+
     # Strip markdown noise from each line before matching
     clean_output = re.sub(r"[*_`>#\-]", " ", review_output)
 
@@ -81,7 +86,11 @@ def parse_verdict(review_output: str) -> str:
         line_stripped = line.strip().lower()
         if "verdict" in line_stripped and ":" in line_stripped:
             after_colon = line_stripped.split(":", 1)[1].strip()
-            if "needs changes" in after_colon or "needs_changes" in after_colon or "needs changes" in line_stripped:
+            if (
+                "needs changes" in after_colon
+                or "needs_changes" in after_colon
+                or "needs changes" in line_stripped
+            ):
                 return "NEEDS CHANGES"
             if "lgtm" in after_colon:
                 return "LGTM"
@@ -91,7 +100,7 @@ def parse_verdict(review_output: str) -> str:
     if "needs changes" in clean_lower or "needs_changes" in clean_lower:
         # Only count it if "verdict" appears nearby (within 100 chars)
         idx = clean_lower.find("needs changes")
-        if idx != -1 and "verdict" in clean_lower[max(0, idx - 100):idx + 50]:
+        if idx != -1 and "verdict" in clean_lower[max(0, idx - 100) : idx + 50]:
             return "NEEDS CHANGES"
 
     # No clear verdict found — be lenient
@@ -157,7 +166,9 @@ def _safe_label_pr(pr_number: str, label: str) -> None:
     try:
         label_pr(pr_number, label)
     except Exception as e:
-        logger.warning(f"Failed to add label '{label}' to PR #{pr_number} (non-blocking): {e}")
+        logger.warning(
+            f"Failed to add label '{label}' to PR #{pr_number} (non-blocking): {e}"
+        )
 
 
 def _safe_post_pr_comment(pr_number: str, body: str) -> None:
@@ -222,9 +233,14 @@ def main() -> None:
         if not diff.strip():
             logger.warning("No diff found. Marking as passed.")
             _safe_label_pr(pr_number, "review-passed")
-            _safe_post_pr_comment(pr_number, format_review_summary(
-                "No changes detected. Auto-approving." + _build_cost_section(_cost_baseline), "PASSED"
-            ))
+            _safe_post_pr_comment(
+                pr_number,
+                format_review_summary(
+                    "No changes detected. Auto-approving."
+                    + _build_cost_section(_cost_baseline),
+                    "PASSED",
+                ),
+            )
             return
 
         # Truncate diff if too large to avoid token limits
@@ -245,9 +261,13 @@ def main() -> None:
 
         # Prepend any visual QA findings from the after-screenshot review
         # (only relevant for frontend issues that actually took screenshots)
-        visual_verdict = read_visual_verdict(SCREENSHOTS_DIR) if issue.is_frontend() else None
+        visual_verdict = (
+            read_visual_verdict(SCREENSHOTS_DIR) if issue.is_frontend() else None
+        )
         if visual_verdict:
-            logger.info(f"Injecting visual verdict into review prompt: {visual_verdict.splitlines()[0]}")
+            logger.info(
+                f"Injecting visual verdict into review prompt: {visual_verdict.splitlines()[0]}"
+            )
             review_prompt = (
                 f"## Visual QA (from after-screenshot review)\n"
                 f"{visual_verdict}\n\n"
@@ -262,15 +282,24 @@ def main() -> None:
             result = reviewer.run(review_prompt, timeout=REVIEW_TIMEOUT, cwd=REPO_ROOT)
             last_review_output = result.stdout
         except ClineError as e:
-            logger.error(f"Reviewer Cline crashed: {e}. Treating as LGTM (benefit of the doubt).")
-            visual_verdict = read_visual_verdict(SCREENSHOTS_DIR) if issue.is_frontend() else None
-            visual_section = f"\n\n### Visual QA\n{visual_verdict}" if visual_verdict else ""
+            logger.error(
+                f"Reviewer Cline crashed: {e}. Treating as LGTM (benefit of the doubt)."
+            )
+            visual_verdict = (
+                read_visual_verdict(SCREENSHOTS_DIR) if issue.is_frontend() else None
+            )
+            visual_section = (
+                f"\n\n### Visual QA\n{visual_verdict}" if visual_verdict else ""
+            )
             _safe_label_pr(pr_number, "review-passed")
-            _safe_post_pr_comment(pr_number, format_review_summary(
-                f"Reviewer failed to run (Cline error). Auto-approving.\n\nError: {e}{visual_section}"
-                + _build_cost_section(_cost_baseline),
-                "PASSED"
-            ))
+            _safe_post_pr_comment(
+                pr_number,
+                format_review_summary(
+                    f"Reviewer failed to run (Cline error). Auto-approving.\n\nError: {e}{visual_section}"
+                    + _build_cost_section(_cost_baseline),
+                    "PASSED",
+                ),
+            )
             return
 
         verdict = parse_verdict(last_review_output)
@@ -278,17 +307,29 @@ def main() -> None:
 
         if verdict == "LGTM":
             logger.info("Review passed!")
-            visual_verdict = read_visual_verdict(SCREENSHOTS_DIR) if issue.is_frontend() else None
-            visual_section = f"\n\n### Visual QA\n{visual_verdict}" if visual_verdict else ""
+            visual_verdict = (
+                read_visual_verdict(SCREENSHOTS_DIR) if issue.is_frontend() else None
+            )
+            visual_section = (
+                f"\n\n### Visual QA\n{visual_verdict}" if visual_verdict else ""
+            )
             _safe_label_pr(pr_number, "review-passed")
-            _safe_post_pr_comment(pr_number, format_review_summary(
-                last_review_output + visual_section + _build_cost_section(_cost_baseline), "PASSED"
-            ))
+            _safe_post_pr_comment(
+                pr_number,
+                format_review_summary(
+                    last_review_output
+                    + visual_section
+                    + _build_cost_section(_cost_baseline),
+                    "PASSED",
+                ),
+            )
             return
 
         # ── Verdict is NEEDS CHANGES ────────────────────────────
         if iteration < MAX_REVIEW_ITERATIONS:
-            logger.warning(f"Review rejected. Applying fixes (iteration {iteration})...")
+            logger.warning(
+                f"Review rejected. Applying fixes (iteration {iteration})..."
+            )
 
             fixer = ClineRunner(
                 cline_dir=REPO_ROOT / f".cline-fixer-{iteration}",
@@ -327,12 +368,18 @@ def main() -> None:
 
     # ── 3. Exhausted iterations ─────────────────────────────────
     logger.warning("Max review iterations reached. Posting final review.")
-    visual_verdict = read_visual_verdict(SCREENSHOTS_DIR) if issue.is_frontend() else None
+    visual_verdict = (
+        read_visual_verdict(SCREENSHOTS_DIR) if issue.is_frontend() else None
+    )
     visual_section = f"\n\n### Visual QA\n{visual_verdict}" if visual_verdict else ""
     _safe_label_pr(pr_number, "review-needs-attention")
-    _safe_post_pr_comment(pr_number, format_review_summary(
-        last_review_output + visual_section + _build_cost_section(_cost_baseline), "NEEDS ATTENTION"
-    ))
+    _safe_post_pr_comment(
+        pr_number,
+        format_review_summary(
+            last_review_output + visual_section + _build_cost_section(_cost_baseline),
+            "NEEDS ATTENTION",
+        ),
+    )
 
     logger.info("=" * 60)
     logger.info("Self-Review complete")

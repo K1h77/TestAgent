@@ -14,7 +14,7 @@ import threading
 import time as _time
 import urllib.request
 import urllib.error
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
@@ -60,7 +60,9 @@ _get_openrouter_usage = get_openrouter_usage
 class ClineError(Exception):
     """Raised when a Cline CLI invocation fails."""
 
-    def __init__(self, message: str, stdout: str = "", stderr: str = "", exit_code: int = -1):
+    def __init__(
+        self, message: str, stdout: str = "", stderr: str = "", exit_code: int = -1
+    ):
         super().__init__(message)
         self.stdout = stdout
         self.stderr = stderr
@@ -84,27 +86,59 @@ class ClineResult:
 # Default permissions: allow dev-safe commands, block destructive ones
 DEFAULT_COMMAND_PERMISSIONS = {
     "allow": [
-        "npm *", "npx *", "node *", "git *",
-        "cat *", "ls *", "mkdir *", "cd *", "echo *", "cp *", "mv *",
-        "python *", "pip *", "pytest *",
+        "npm *",
+        "npx *",
+        "node *",
+        "git *",
+        "cat *",
+        "ls *",
+        "mkdir *",
+        "cd *",
+        "echo *",
+        "cp *",
+        "mv *",
+        "python *",
+        "pip *",
+        "pytest *",
     ],
     "deny": [
-        "rm -rf /", "rm -rf /*", "shutdown *", "reboot *",
-        "curl *|*sh", "wget *|*sh",
+        "rm -rf /",
+        "rm -rf /*",
+        "shutdown *",
+        "reboot *",
+        "curl *|*sh",
+        "wget *|*sh",
     ],
     "allowRedirects": True,
 }
 
 READ_ONLY_PERMISSIONS = {
     "allow": [
-        "git diff *", "git log *", "git show *", "git status",
-        "cat *", "ls *", "npm test", "npx jest *", "npx playwright *",
-        "node *", "head *", "tail *", "wc *",
+        "git diff *",
+        "git log *",
+        "git show *",
+        "git status",
+        "cat *",
+        "ls *",
+        "npm test",
+        "npx jest *",
+        "npx playwright *",
+        "node *",
+        "head *",
+        "tail *",
+        "wc *",
     ],
     "deny": [
-        "rm *", "mv *", "cp *", "git push *", "git commit *",
-        "git add *", "git checkout *", "git reset *",
-        "npm install *", "pip install *",
+        "rm *",
+        "mv *",
+        "cp *",
+        "git push *",
+        "git commit *",
+        "git add *",
+        "git checkout *",
+        "git reset *",
+        "npm install *",
+        "pip install *",
     ],
     "allowRedirects": False,
 }
@@ -161,6 +195,7 @@ class ClineRunner:
             settings_dir.mkdir(parents=True, exist_ok=True)
             dest = settings_dir / "cline_mcp_settings.json"
             import shutil as sh
+
             sh.copy2(self.mcp_settings_path, dest)
             logger.debug(f"Copied MCP settings to {dest}")
 
@@ -217,7 +252,8 @@ class ClineRunner:
         cmd = [
             "cline",
             "-y",
-            "--timeout", str(timeout),
+            "--timeout",
+            str(timeout),
         ]
 
         # Start in plan mode when a distinct plan model is configured.
@@ -236,7 +272,9 @@ class ClineRunner:
         env["CLINE_DIR"] = str(self.cline_dir)
         env["CLINE_COMMAND_PERMISSIONS"] = json.dumps(self.command_permissions)
 
-        logger.info(f"Running Cline (act={self.model}, plan={self.plan_model}, timeout={timeout}s)")
+        logger.info(
+            f"Running Cline (act={self.model}, plan={self.plan_model}, timeout={timeout}s)"
+        )
         logger.debug(f"CLINE_DIR={self.cline_dir}")
         logger.debug(f"Prompt length: {len(prompt)} chars")
 
@@ -261,7 +299,9 @@ class ClineRunner:
                 for pattern in _STUCK_PATTERNS:
                     if pattern.lower() in line.lower():
                         with lock:
-                            stuck_reason = f"Detected stuck pattern: '{pattern}' in: {line}"
+                            stuck_reason = (
+                                f"Detected stuck pattern: '{pattern}' in: {line}"
+                            )
                         return  # stop reading, main loop will kill
 
         try:
@@ -321,8 +361,16 @@ class ClineRunner:
                     elapsed = int(now - (deadline - timeout - 30))
                     if current_usage is not None and last_usage is not None:
                         delta = current_usage - last_usage
-                        run_total = current_usage - run_baseline if run_baseline is not None else None
-                        run_str = f" / ${run_total:.4f} this run" if run_total is not None else ""
+                        run_total = (
+                            current_usage - run_baseline
+                            if run_baseline is not None
+                            else None
+                        )
+                        run_str = (
+                            f" / ${run_total:.4f} this run"
+                            if run_total is not None
+                            else ""
+                        )
                         usage_str = f" | +${delta:.4f} this interval{run_str}"
                     elif current_usage is not None:
                         usage_str = f" | usage=${current_usage:.4f}"

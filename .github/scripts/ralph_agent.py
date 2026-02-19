@@ -128,7 +128,9 @@ def coding_loop(issue, is_hard, default_cline, hard_cline) -> tuple[bool, int]:
 
         use_hard = is_hard or is_final
         coding_cline = hard_cline if use_hard else default_cline
-        active_planner = _cfg.models.planner_hard if use_hard else _cfg.models.planner_default
+        active_planner = (
+            _cfg.models.planner_hard if use_hard else _cfg.models.planner_default
+        )
         active_coder = _cfg.models.coder_hard if use_hard else _cfg.models.coder_default
         logger.info(
             f"--- Coding attempt {attempt}/{MAX_CODING_ATTEMPTS} "
@@ -230,13 +232,21 @@ def commit_changes(issue, branch) -> None:
         logger.error(f"Commit/push failed: {error_msg}")
         post_issue_comment(
             issue.number,
-            format_summary({"status": "failed", "issue_number": issue.number, "error": error_msg}),
+            format_summary(
+                {"status": "failed", "issue_number": issue.number, "error": error_msg}
+            ),
         )
         raise RuntimeError(f"Commit/push failed: {error_msg}") from e
 
 
 def build_and_create_pr(
-    issue, branch, tests_passed, coding_attempts, before_path, after_paths, cost_baseline
+    issue,
+    branch,
+    tests_passed,
+    coding_attempts,
+    before_path,
+    after_paths,
+    cost_baseline,
 ) -> tuple[str, str]:
     repo_name = get_repo_name()
 
@@ -294,13 +304,15 @@ def post_completion_comment(issue, pr_url, tests_passed, coding_attempts) -> Non
     try:
         post_issue_comment(
             issue.number,
-            format_summary({
-                "status": "pr_created",
-                "issue_number": issue.number,
-                "pr_url": pr_url,
-                "tests_passed": tests_passed,
-                "coding_attempts": coding_attempts,
-            }),
+            format_summary(
+                {
+                    "status": "pr_created",
+                    "issue_number": issue.number,
+                    "pr_url": pr_url,
+                    "tests_passed": tests_passed,
+                    "coding_attempts": coding_attempts,
+                }
+            ),
         )
     except GitError as e:
         logger.warning(f"Failed to post completion comment (non-blocking): {e}")
@@ -314,25 +326,33 @@ def main() -> None:
 
     cost_baseline = get_openrouter_usage()
 
-    issue                                    = validate_inputs()
-    branch                                   = setup_git_branch(issue)
+    issue = validate_inputs()
+    branch = setup_git_branch(issue)
     post_start_comment(issue)
     is_hard, default_cline, hard_cline, vision_cline = configure_runners(issue)
-    server                                   = start_server_if_frontend_issue(issue)
+    server = start_server_if_frontend_issue(issue)
 
     before_path = None
     after_paths: list = []
 
     try:
-        tests_passed, coding_attempts = coding_loop(issue, is_hard, default_cline, hard_cline)
-        after_paths, server           = take_after_screenshots(issue, vision_cline, server)
+        tests_passed, coding_attempts = coding_loop(
+            issue, is_hard, default_cline, hard_cline
+        )
+        after_paths, server = take_after_screenshots(issue, vision_cline, server)
     finally:
         if server is not None:
             stop_server(server)
 
     commit_changes(issue, branch)
     pr_url, _ = build_and_create_pr(
-        issue, branch, tests_passed, coding_attempts, before_path, after_paths, cost_baseline
+        issue,
+        branch,
+        tests_passed,
+        coding_attempts,
+        before_path,
+        after_paths,
+        cost_baseline,
     )
     post_completion_comment(issue, pr_url, tests_passed, coding_attempts)
 

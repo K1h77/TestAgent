@@ -6,7 +6,6 @@ Uses subprocess to call git and gh CLI directly.
 
 import logging
 import subprocess
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +78,9 @@ def _run_gh(args: list[str]) -> subprocess.CompletedProcess:
     return result
 
 
-def configure_git_user(name: str = "Ralph Bot", email: str = "ralph-bot@users.noreply.github.com") -> None:
+def configure_git_user(
+    name: str = "Ralph Bot", email: str = "ralph-bot@users.noreply.github.com"
+) -> None:
     """Configure git user for commits.
 
     Args:
@@ -120,6 +121,7 @@ def create_branch(name: str) -> str:
     # (created by workflow unit tests before agent runs)
     import shutil
     from pathlib import Path
+
     for pycache_dir in Path(".").rglob("__pycache__"):
         try:
             shutil.rmtree(pycache_dir)
@@ -131,30 +133,34 @@ def create_branch(name: str) -> str:
     unique_name = name
     version = 2
     max_attempts = 20  # Prevent infinite loop
-    
+
     while version <= max_attempts:
         ls = _run_git(["ls-remote", "--heads", "origin", unique_name], check=False)
         if not ls.stdout.strip():
             # Branch doesn't exist on remote — use it
             break
-        
+
         # Branch exists, try next version
-        logger.info(f"Branch '{unique_name}' already exists on remote, trying next version...")
+        logger.info(
+            f"Branch '{unique_name}' already exists on remote, trying next version..."
+        )
         unique_name = f"{name}-v{version}"
         version += 1
-    
+
     if version > max_attempts:
         raise GitError(
             f"Could not find unique branch name after {max_attempts} attempts. "
             f"Too many existing branches for issue. Consider cleaning up old branches."
         )
-    
+
     if unique_name != name:
-        logger.warning(f"Original branch '{name}' exists. Using '{unique_name}' instead.")
-    
+        logger.warning(
+            f"Original branch '{name}' exists. Using '{unique_name}' instead."
+        )
+
     _run_git(["checkout", "-b", unique_name])
     logger.info(f"On branch: {unique_name}")
-    
+
     return unique_name
 
 
@@ -179,7 +185,11 @@ def commit_and_push(message: str, branch: str) -> None:
 
     # Safety check: abort if any secrets.json files are staged (API key leak guard)
     staged = _run_git(["diff", "--cached", "--name-only"])
-    secret_files = [f for f in staged.stdout.splitlines() if "secrets.json" in f or "globalState.json" in f]
+    secret_files = [
+        f
+        for f in staged.stdout.splitlines()
+        if "secrets.json" in f or "globalState.json" in f
+    ]
     if secret_files:
         _run_git(["reset", "HEAD"] + secret_files)  # unstage them
         logger.error(
@@ -243,13 +253,20 @@ def create_pr(title: str, body: str, base: str, head: str) -> str:
     if not head or not head.strip():
         raise ValueError("PR head branch cannot be empty.")
 
-    result = _run_gh([
-        "pr", "create",
-        "--title", title.strip(),
-        "--body", body,
-        "--base", base.strip(),
-        "--head", head.strip(),
-    ])
+    result = _run_gh(
+        [
+            "pr",
+            "create",
+            "--title",
+            title.strip(),
+            "--body",
+            body,
+            "--base",
+            base.strip(),
+            "--head",
+            head.strip(),
+        ]
+    )
 
     pr_url = result.stdout.strip()
     if not pr_url:

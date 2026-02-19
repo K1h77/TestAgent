@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from lib.utils import load_prompt_template, embed_screenshots_markdown, screenshot_relative_path, read_visual_verdict
+from lib.utils import load_prompt_template, screenshot_relative_path
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,9 @@ class ScreenshotError(Exception):
 
 
 def _recover_misnamed_screenshot(output_path: Path) -> Optional[Path]:
-    saved = sorted(output_path.parent.glob("*.png"), key=lambda p: p.stat().st_mtime, reverse=True)
+    saved = sorted(
+        output_path.parent.glob("*.png"), key=lambda p: p.stat().st_mtime, reverse=True
+    )
     if not saved:
         return None
     best = saved[0]
@@ -70,18 +72,28 @@ def take_screenshot(
     try:
         cline_runner.run(prompt, timeout=timeout)
     except Exception as e:
-        logger.warning(f"Before screenshot failed (non-blocking): {e}. Continuing without screenshot.")
+        logger.warning(
+            f"Before screenshot failed (non-blocking): {e}. Continuing without screenshot."
+        )
         return None
 
     result = _validate_screenshot(output_path)
     if result:
-        logger.info(f"Before screenshot saved: {result} ({result.stat().st_size} bytes)")
+        logger.info(
+            f"Before screenshot saved: {result} ({result.stat().st_size} bytes)"
+        )
     return result
 
 
 def _run_after_screenshot_cline(
-    cline_runner, screenshots_dir, verdict_path,
-    issue_number, issue_title, issue_body, frontend_diff, timeout,
+    cline_runner,
+    screenshots_dir,
+    verdict_path,
+    issue_number,
+    issue_title,
+    issue_body,
+    frontend_diff,
+    timeout,
 ) -> Optional[Exception]:
     prompt = load_prompt_template(
         PROMPTS_DIR,
@@ -91,7 +103,9 @@ def _run_after_screenshot_cline(
         ISSUE_NUMBER=str(issue_number),
         ISSUE_TITLE=issue_title,
         ISSUE_BODY=issue_body[:2000],
-        FRONTEND_DIFF=frontend_diff[:6000] if frontend_diff else "(no frontend files changed)",
+        FRONTEND_DIFF=frontend_diff[:6000]
+        if frontend_diff
+        else "(no frontend files changed)",
     )
     logger.info(f"Taking 'after' screenshots + visual review → {screenshots_dir}")
     try:
@@ -152,11 +166,21 @@ def take_after_screenshot_with_review(
     verdict_path = screenshots_dir / "visual_verdict.txt"
 
     cline_error = _run_after_screenshot_cline(
-        cline_runner, screenshots_dir, verdict_path,
-        issue_number, issue_title, issue_body, frontend_diff, timeout,
+        cline_runner,
+        screenshots_dir,
+        verdict_path,
+        issue_number,
+        issue_title,
+        issue_body,
+        frontend_diff,
+        timeout,
     )
 
-    result_verdict = verdict_path if verdict_path.exists() and verdict_path.stat().st_size > 0 else None
+    result_verdict = (
+        verdict_path
+        if verdict_path.exists() and verdict_path.stat().st_size > 0
+        else None
+    )
     selected_paths = _parse_selected_paths(verdict_path, screenshots_dir)
 
     if not selected_paths:
@@ -172,8 +196,9 @@ def take_after_screenshot_with_review(
     logger.info(f"After screenshots selected: {[p.name for p in selected_paths]}")
 
     if cline_error and not selected_paths:
-        logger.warning("Cline errored and no screenshots were recovered. Continuing without.")
+        logger.warning(
+            "Cline errored and no screenshots were recovered. Continuing without."
+        )
         return [], None
 
     return selected_paths, result_verdict
-

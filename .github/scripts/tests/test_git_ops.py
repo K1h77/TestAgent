@@ -1,6 +1,5 @@
 """Tests for git_ops module."""
 
-import subprocess
 import pytest
 import sys
 from pathlib import Path
@@ -33,6 +32,7 @@ class TestCreateBranch:
     @patch("lib.git_ops._run_git")
     def test_calls_git_checkout_new_branch(self, mock_git):
         """When branch does not exist on remote, should create it with -b."""
+
         def side_effect(args, check=True):
             result = MagicMock()
             result.returncode = 0
@@ -55,6 +55,7 @@ class TestCreateBranch:
     @patch("lib.git_ops._run_git")
     def test_creates_versioned_branch_when_base_exists(self, mock_git):
         """When branch already exists on remote, should create -v2 version."""
+
         def side_effect(args, check=True):
             result = MagicMock()
             result.returncode = 0
@@ -100,6 +101,7 @@ class TestCommitAndPush:
     @patch("lib.git_ops._run_git")
     def test_no_changes_raises(self, mock_git):
         """If git status --porcelain returns empty, should raise GitError."""
+
         def side_effect(args, check=True):
             result = MagicMock()
             if args[0] == "status":
@@ -118,6 +120,7 @@ class TestCommitAndPush:
     @patch("lib.git_ops._run_git")
     def test_successful_commit_and_push(self, mock_git):
         """Should call git add, check status, commit, and push (check=False)."""
+
         def side_effect(args, check=True):
             result = MagicMock()
             result.returncode = 0
@@ -168,6 +171,7 @@ class TestCommitAndPush:
     @patch("lib.git_ops._run_git")
     def test_non_fast_forward_raises_after_rebase_fails(self, mock_git):
         """If the retry push also fails, should raise GitError."""
+
         def side_effect(args, check=True):
             result = MagicMock()
             result.stdout = "M server.js\n" if args[0] == "status" else ""
@@ -184,6 +188,7 @@ class TestCommitAndPush:
 
         # Make the second push (after rebase) also fail — _run_git with check=True raises
         call_count = {"push": 0}
+
         def side_effect2(args, check=True):
             result = MagicMock()
             result.stdout = "M server.js\n" if args[0] == "status" else ""

@@ -1,6 +1,5 @@
 """Tests for issue_parser module."""
 
-import os
 import pytest
 import sys
 from pathlib import Path
@@ -14,8 +13,14 @@ class TestParseIssue:
     """Tests for parse_issue()."""
 
     def test_valid_input(self):
-        result = parse_issue("42", "Fix the login bug", "The login form crashes on submit")
-        assert result == Issue(number=42, title="Fix the login bug", body="The login form crashes on submit")
+        result = parse_issue(
+            "42", "Fix the login bug", "The login form crashes on submit"
+        )
+        assert result == Issue(
+            number=42,
+            title="Fix the login bug",
+            body="The login form crashes on submit",
+        )
 
     def test_strips_whitespace(self):
         result = parse_issue("  42  ", "  Fix bug  ", "  Description  ")
@@ -122,7 +127,9 @@ class TestIssueLabels:
         assert issue.is_frontend() is True
 
     def test_valid_input_includes_labels(self):
-        issue = parse_issue("42", "Fix UI bug", "Button is broken", labels="frontend,bug")
+        issue = parse_issue(
+            "42", "Fix UI bug", "Button is broken", labels="frontend,bug"
+        )
         assert issue.number == 42
         assert issue.title == "Fix UI bug"
         assert issue.body == "Button is broken"

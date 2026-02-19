@@ -15,6 +15,8 @@ Usage:
     cfg.timeouts.coding_seconds        # 1800
 """
 
+# TODO use pydantic settings instead of yaml parsing
+
 import logging
 from dataclasses import dataclass
 from functools import lru_cache
@@ -30,10 +32,12 @@ _CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "agent_config.yml
 
 @dataclass(frozen=True)
 class Models:
-    coder_default: str   # Coder for non-hard tickets and early attempts (e.g. DeepSeek V3.2)
-    coder_hard: str      # Coder for hard tickets + final attempt (e.g. MiniMax M2.5)
-    planner_hard: str    # Planner for issues labelled "hard" (e.g. GLM-5)
-    planner_default: str # Planner for all other issues (e.g. DeepSeek V3.2)
+    coder_default: (
+        str  # Coder for non-hard tickets and early attempts (e.g. DeepSeek V3.2)
+    )
+    coder_hard: str  # Coder for hard tickets + final attempt (e.g. MiniMax M2.5)
+    planner_hard: str  # Planner for issues labelled "hard" (e.g. GLM-5)
+    planner_default: str  # Planner for all other issues (e.g. DeepSeek V3.2)
     vision: str
     reviewer: str
     fixer: str

@@ -7,7 +7,6 @@ from lib.logging_config import format_summary, format_review_summary
 
 
 class TestFormatSummary:
-
     def test_started_status(self):
         result = format_summary({"status": "started", "issue_number": 7})
         assert "Ralph Agent" in result
@@ -15,33 +14,39 @@ class TestFormatSummary:
         assert "working on" in result.lower()
 
     def test_pr_created_with_tests_passing(self):
-        result = format_summary({
-            "status": "pr_created",
-            "issue_number": 7,
-            "pr_url": "https://github.com/org/repo/pull/99",
-            "tests_passed": True,
-            "coding_attempts": 2,
-        })
+        result = format_summary(
+            {
+                "status": "pr_created",
+                "issue_number": 7,
+                "pr_url": "https://github.com/org/repo/pull/99",
+                "tests_passed": True,
+                "coding_attempts": 2,
+            }
+        )
         assert "https://github.com/org/repo/pull/99" in result
         assert "passing" in result
         assert "2" in result
 
     def test_pr_created_with_tests_failing(self):
-        result = format_summary({
-            "status": "pr_created",
-            "issue_number": 7,
-            "pr_url": "https://github.com/org/repo/pull/99",
-            "tests_passed": False,
-            "coding_attempts": 3,
-        })
+        result = format_summary(
+            {
+                "status": "pr_created",
+                "issue_number": 7,
+                "pr_url": "https://github.com/org/repo/pull/99",
+                "tests_passed": False,
+                "coding_attempts": 3,
+            }
+        )
         assert "partially passing" in result
 
     def test_failed_status_includes_error(self):
-        result = format_summary({
-            "status": "failed",
-            "issue_number": 7,
-            "error": "Push rejected",
-        })
+        result = format_summary(
+            {
+                "status": "failed",
+                "issue_number": 7,
+                "error": "Push rejected",
+            }
+        )
         assert "failed" in result.lower()
         assert "Push rejected" in result
         assert "#7" in result
@@ -56,7 +61,6 @@ class TestFormatSummary:
 
 
 class TestFormatReviewSummary:
-
     def test_verdict_appears_in_header(self):
         result = format_review_summary("Looks good.", "PASSED")
         assert "PASSED" in result

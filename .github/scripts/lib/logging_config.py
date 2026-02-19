@@ -99,7 +99,10 @@ def format_review_summary(review_output: str, verdict: str) -> str:
     # Truncate review output to keep comment concise
     max_len = 3000
     if len(review_output) > max_len:
-        review_output = review_output[:max_len] + "\n\n... (truncated, see workflow logs for full output)"
+        review_output = (
+            review_output[:max_len]
+            + "\n\n... (truncated, see workflow logs for full output)"
+        )
 
     lines.append(review_output)
     lines.append("")

@@ -1,4 +1,3 @@
-import pytest
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -35,6 +34,7 @@ class TestTakeScreenshot:
         output_path = tmp_path / "screenshot.png"
 
         mock_cline = MagicMock()
+
         # Simulate Cline creating the file
         def create_file(*args, **kwargs):
             output_path.write_bytes(b"\x89PNG fake image data")
@@ -80,9 +80,7 @@ class TestTakeScreenshot:
             assert result == output_path
             assert output_path.exists()
             # Should log a warning mentioning the rename
-            warning_calls = " ".join(
-                str(c) for c in mock_logger.warning.call_args_list
-            )
+            warning_calls = " ".join(str(c) for c in mock_logger.warning.call_args_list)
             assert "switch.png" in warning_calls
 
     def test_returns_none_when_file_empty(self, tmp_path):
@@ -90,6 +88,7 @@ class TestTakeScreenshot:
         output_path = tmp_path / "screenshot.png"
 
         mock_cline = MagicMock()
+
         def create_empty(*args, **kwargs):
             output_path.write_bytes(b"")
             return MagicMock(success=True)
@@ -119,7 +118,9 @@ class TestEmbedScreenshotsMarkdown:
         after1 = tmp_path / "screenshots" / "after_01.png"
         after2 = tmp_path / "screenshots" / "after_02.png"
 
-        md = embed_screenshots_markdown(before, [after1, after2], "ralph/issue-1", "user/repo")
+        md = embed_screenshots_markdown(
+            before, [after1, after2], "ralph/issue-1", "user/repo"
+        )
 
         assert "Before" in md
         assert "After" in md
@@ -163,7 +164,6 @@ class TestEmbedScreenshotsMarkdown:
 
 
 class TestToRelativePath:
-
     def test_extracts_from_screenshots_dir(self):
         path = Path("/home/user/project/screenshots/before.png")
         assert _to_relative_path(path) == "screenshots/before.png"
@@ -178,7 +178,6 @@ class TestToRelativePath:
 
 
 class TestRecoverMisnamedScreenshot:
-
     def test_returns_none_when_no_pngs(self, tmp_path):
         output_path = tmp_path / "before.png"
         result = _recover_misnamed_screenshot(output_path)
@@ -198,14 +197,15 @@ class TestRecoverMisnamedScreenshot:
         old = tmp_path / "old.png"
         new = tmp_path / "new.png"
         old.write_bytes(b"\x89PNG old")
-        import time; time.sleep(0.01)
+        import time
+
+        time.sleep(0.01)
         new.write_bytes(b"\x89PNG new")
         _recover_misnamed_screenshot(output_path)
         assert output_path.read_bytes() == b"\x89PNG new"
 
 
 class TestValidateScreenshot:
-
     def test_returns_path_for_valid_file(self, tmp_path):
         p = tmp_path / "shot.png"
         p.write_bytes(b"\x89PNG data")
@@ -230,7 +230,6 @@ class TestValidateScreenshot:
 
 
 class TestParseSelectedPaths:
-
     def test_returns_empty_when_verdict_missing(self, tmp_path):
         verdict_path = tmp_path / "visual_verdict.txt"
         assert _parse_selected_paths(verdict_path, tmp_path) == []
@@ -297,7 +296,6 @@ class TestParseSelectedPaths:
 
 
 class TestFallbackScreenshotSelection:
-
     def test_returns_after_pngs_sorted_by_name(self, tmp_path):
         b = tmp_path / "after_02.png"
         a = tmp_path / "after_01.png"
