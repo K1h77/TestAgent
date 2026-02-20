@@ -1,0 +1,2 @@
+VISUAL: OK
+SELECTED: after_01.png, after_02.png, after_03.png

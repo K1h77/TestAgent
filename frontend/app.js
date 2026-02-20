@@ -27,7 +27,7 @@ async function loadTasks() {
         displayTasks(tasks);
     } catch (error) {
         console.error('Error loading tasks:', error);
-        alert('Failed to load tasks. Make sure the backend server is running on port 3000.');
+        showErrorAlert('Failed to load tasks. Make sure the backend server is running on port 3000.');
     }
 }
 
@@ -64,7 +64,7 @@ async function addTask() {
     const description = descriptionInput.value.trim();
     
     if (!title) {
-        alert('Please enter a task title');
+        showErrorAlert('Please enter a task title');
         return;
     }
     
@@ -80,13 +80,14 @@ async function addTask() {
         if (response.ok) {
             titleInput.value = '';
             descriptionInput.value = '';
+            showSuccessAlert('Task added successfully!');
             loadTasks();
         } else {
-            alert('Failed to add task');
+            showErrorAlert('Failed to add task');
         }
     } catch (error) {
         console.error('Error adding task:', error);
-        alert('Failed to add task. Make sure the backend server is running.');
+        showErrorAlert('Failed to add task. Make sure the backend server is running.');
     }
 }
 
@@ -102,13 +103,15 @@ async function toggleTask(id, completed) {
         });
         
         if (response.ok) {
+            const message = completed ? 'Task marked as completed!' : 'Task marked as incomplete';
+            showSuccessAlert(message);
             loadTasks();
         } else {
-            alert('Failed to update task');
+            showErrorAlert('Failed to update task');
         }
     } catch (error) {
         console.error('Error updating task:', error);
-        alert('Failed to update task. Make sure the backend server is running.');
+        showErrorAlert('Failed to update task. Make sure the backend server is running.');
     }
 }
 
@@ -124,13 +127,14 @@ async function deleteTask(id) {
         });
         
         if (response.ok) {
+            showSuccessAlert('Task deleted successfully!');
             loadTasks();
         } else {
-            alert('Failed to delete task');
+            showErrorAlert('Failed to delete task');
         }
     } catch (error) {
         console.error('Error deleting task:', error);
-        alert('Failed to delete task. Make sure the backend server is running.');
+        showErrorAlert('Failed to delete task. Make sure the backend server is running.');
     }
 }
 
