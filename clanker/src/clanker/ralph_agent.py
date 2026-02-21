@@ -47,8 +47,10 @@ CODING_TIMEOUT = _cfg.timeouts.coding_seconds
 
 
 def validate_inputs():
-    env = IssueSettings()
-    ApiSettings()  # validates OPENROUTER_API_KEY is set
+    env = IssueSettings() # type: ignore
+    
+    # validates OPENROUTER_API_KEY is set
+    ApiSettings() # type: ignore
 
     issue = parse_issue(
         number=env.issue_number,

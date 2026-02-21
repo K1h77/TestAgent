@@ -175,11 +175,14 @@ def main() -> None:
     logger.info("=" * 60)
     # Snapshot OpenRouter usage at start for review cost tracking
     _cost_baseline = get_openrouter_usage()
+    
     # ── 1. Validate inputs ──────────────────────────────────────
-    env = IssueSettings()
-    review_env = ReviewSettings()
-    ApiSettings()  # validates OPENROUTER_API_KEY is set
-
+    env = IssueSettings() # type: ignore
+    review_env = ReviewSettings() # type: ignore
+    
+    # Validates OPENROUTER_API_KEY is set 
+    ApiSettings()  # type: ignore
+ 
     issue = parse_issue(
         number=env.issue_number,
         title=env.issue_title,
