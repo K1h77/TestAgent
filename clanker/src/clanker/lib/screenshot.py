@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from ralph.lib.prompt_utils import load_prompt_template, get_default_prompts_dir
+from .prompt_utils import load_prompt_template, get_default_prompts_dir
 
 logger = logging.getLogger(__name__)
 

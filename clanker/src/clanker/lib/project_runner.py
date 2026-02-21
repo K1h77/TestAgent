@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ralph.lib.agent_config import ServerConfig
+    from clanker.lib.agent_config import ServerConfig
 
 logger = logging.getLogger("ralph-agent")
 

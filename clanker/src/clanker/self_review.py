@@ -15,14 +15,14 @@ import re
 import sys
 from pathlib import Path
 
-from ralph.lib.agent_config import load_config
-from ralph.lib.cline_runner import (
+from clanker.lib.agent_config import load_config
+from clanker.lib.cline_runner import (
     ClineRunner,
     ClineError,
     READ_ONLY_PERMISSIONS,
     get_openrouter_usage,
 )
-from ralph.lib.git_ops import (
+from clanker.lib.git_ops import (
     commit_and_push,
     get_diff,
     get_changed_files,
@@ -30,11 +30,11 @@ from ralph.lib.git_ops import (
     label_pr,
     GitError,
 )
-from ralph.lib.issue_parser import parse_issue, require_env
-from ralph.lib.logging_config import setup_logging, format_review_summary
-from ralph.lib.project_runner import run_tests
-from ralph.lib.prompt_utils import load_prompt_template, get_default_prompts_dir
-from ralph.lib.screenshot import read_visual_verdict
+from clanker.lib.issue_parser import parse_issue, require_env
+from clanker.lib.logging_config import setup_logging, format_review_summary
+from clanker.lib.project_runner import run_tests
+from clanker.lib.prompt_utils import load_prompt_template, get_default_prompts_dir
+from clanker.lib.screenshot import read_visual_verdict
 
 logger = logging.getLogger("self-review")
 

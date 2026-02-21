@@ -6,11 +6,11 @@ import sys
 import time
 from pathlib import Path
 
-from ralph.lib.agent_config import load_config
-from ralph.lib.cline_runner import ClineRunner, ClineError, get_openrouter_usage
-from ralph.lib.project_runner import run_tests, start_server, stop_server, get_frontend_diff
-from ralph.lib.prompt_utils import load_prompt_template, get_default_prompts_dir
-from ralph.lib.git_ops import (
+from clanker.lib.agent_config import load_config
+from clanker.lib.cline_runner import ClineRunner, ClineError, get_openrouter_usage
+from clanker.lib.project_runner import run_tests, start_server, stop_server, get_frontend_diff
+from clanker.lib.prompt_utils import load_prompt_template, get_default_prompts_dir
+from clanker.lib.git_ops import (
     configure_git_user,
     create_branch,
     commit_and_push,
@@ -19,10 +19,10 @@ from ralph.lib.git_ops import (
     post_issue_comment,
     GitError,
 )
-from ralph.lib.issue_parser import parse_issue, require_env
-from ralph.lib.logging_config import setup_logging, format_summary
-from ralph.lib.screenshot import take_after_screenshot_with_review, embed_screenshots_markdown
-from ralph.lib.utils import get_git_diff, get_repo_name
+from clanker.lib.issue_parser import parse_issue, require_env
+from clanker.lib.logging_config import setup_logging, format_summary
+from clanker.lib.screenshot import take_after_screenshot_with_review, embed_screenshots_markdown
+from clanker.lib.utils import get_git_diff, get_repo_name
 
 logger = logging.getLogger("ralph-agent")
 
