@@ -1,8 +1,8 @@
 import pytest
 from pathlib import Path
 
-from ralph.lib.prompt_utils import load_prompt_template
-from ralph.lib.screenshot import screenshot_relative_path, read_visual_verdict
+from clanker.lib.prompt_utils import load_prompt_template
+from clanker.lib.screenshot import screenshot_relative_path, read_visual_verdict
 
 
 class TestLoadPromptTemplate:

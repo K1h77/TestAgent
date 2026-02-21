@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from ralph.lib.screenshot import (
+from clanker.lib.screenshot import (
     take_screenshot,
     embed_screenshots_markdown,
     _to_relative_path,
@@ -11,7 +11,7 @@ from ralph.lib.screenshot import (
     _parse_selected_paths,
     _fallback_screenshot_selection,
 )
-from ralph.lib.cline_runner import ClineError
+from clanker.lib.cline_runner import ClineError
 
 
 class TestTakeScreenshot:
@@ -72,7 +72,7 @@ class TestTakeScreenshot:
         mock_cline = MagicMock()
         mock_cline.run.side_effect = save_differently
 
-        with patch("ralph.lib.screenshot.logger") as mock_logger:
+        with patch("clanker.lib.screenshot.logger") as mock_logger:
             result = take_screenshot(mock_cline, output_path)
             # Should rename switch.png → before.png and return the path
             assert result == output_path
@@ -117,13 +117,13 @@ class TestEmbedScreenshotsMarkdown:
         after2 = tmp_path / "screenshots" / "after_02.png"
 
         md = embed_screenshots_markdown(
-            before, [after1, after2], "ralph/issue-1", "user/repo"
+            before, [after1, after2], "clanker/issue-1", "user/repo"
         )
 
         assert "Before" in md
         assert "After" in md
         assert "raw.githubusercontent.com" in md
-        assert "ralph/issue-1" in md
+        assert "clanker/issue-1" in md
         assert "after_01.png" in md
         assert "after_02.png" in md
 

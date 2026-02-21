@@ -1,4 +1,4 @@
-from ralph.lib.logging_config import format_summary, format_review_summary
+from clanker.lib.logging_config import format_summary, format_review_summary
 
 
 class TestFormatSummary:

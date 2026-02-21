@@ -5,7 +5,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from ralph.lib.cline_runner import (
+from clanker.lib.cline_runner import (
     ClineRunner,
     ClineResult,
     ClineError,

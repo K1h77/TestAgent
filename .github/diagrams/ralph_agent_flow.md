@@ -2,7 +2,7 @@
 
 ## Scope
 
-Ralph is an autonomous GitHub issue resolver. It is triggered by a single label (`ralph-autofix`) and operates entirely within CI — no human intervention required from trigger to PR.
+Ralph is an autonomous GitHub issue resolver. It is triggered by a single label (`clanker-autofix`) and operates entirely within CI — no human intervention required from trigger to PR.
 
 **What Ralph does:**
 
@@ -14,7 +14,7 @@ Ralph is an autonomous GitHub issue resolver. It is triggered by a single label 
 
 **What Ralph does not do:**
 
-- Does not handle issues without the `ralph-autofix` label
+- Does not handle issues without the `clanker-autofix` label
 - Does not push directly to `main` — all changes land in a PR for human merge
 - Does not retry indefinitely — coding attempts, review iterations, and self-heal attempts are all capped by config
 - Does not require any human input once the label is applied
@@ -142,11 +142,11 @@ flowchart TD
 
 ---
 
-## CI/CD Workflow: `ralph-autofix.yml`
+## CI/CD Workflow: `clanker-autofix.yml`
 
 ```mermaid
 flowchart TD
-    A([Issue labeled\n'ralph-autofix'\nOR workflow_dispatch]) --> B{Label is\n'ralph-autofix'\nor manual trigger?}
+    A([Issue labeled\n'clanker-autofix'\nOR workflow_dispatch]) --> B{Label is\n'clanker-autofix'\nor manual trigger?}
     B -- No --> C([Skip — do nothing])
     B -- Yes --> D[Concurrency lock\nralph-autofix-ISSUE_N\nnon-cancelling]
 
@@ -191,7 +191,7 @@ flowchart LR
         A([Issue labeled\nralph-autofix])
     end
 
-    subgraph CI["ralph-autofix.yml (ubuntu-latest, 90 min)"]
+    subgraph CI["clanker-autofix.yml (ubuntu-latest, 90 min)"]
         B[Environment Setup\nNode 22 · Python 3.12\nCline · Playwright]
         C[Validate API Key\nSyntax check + pytest]
 

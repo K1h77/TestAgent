@@ -21,7 +21,7 @@ on:
 
 # Only one run per issue at a time.
 concurrency:
-  group: ralph-autofix-${{ github.event.issue.number || inputs.issue_number }}
+  group: clanker-autofix-${{ github.event.issue.number || inputs.issue_number }}
   cancel-in-progress: false
 
 permissions:
@@ -31,7 +31,7 @@ permissions:
 
 jobs:
   autofix:
-    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'ralph-autofix'
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'clanker-autofix'
     runs-on: ubuntu-latest
     timeout-minutes: 90
 
@@ -108,7 +108,7 @@ jobs:
       # ── Run agent Python tests ────────────────────────────────
       - name: Check agent scripts for syntax errors
         run: |
-          find ralph tests -name "*.py" | xargs uv run python -m py_compile
+          find clanker tests -name "*.py" | xargs uv run python -m py_compile
           echo "All Python files passed syntax check."
 
       - name: Run agent unit tests
@@ -117,7 +117,7 @@ jobs:
       # ── Main Agent ────────────────────────────────────────────
       - name: Run Ralph Agent
         id: agent
-        run: uv run ralph-agent
+        run: uv run clanker-agent
 
       # ── Scrub Cline working dirs (contain secrets.json) ───────
       # Runs immediately after the agent, before upload/review steps,
@@ -132,14 +132,14 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ralph-screenshots-${{ github.event.issue.number || inputs.issue_number }}
+          name: clanker-screenshots-${{ github.event.issue.number || inputs.issue_number }}
           path: screenshots/
           if-no-files-found: ignore
 
       # ── Self-Review ───────────────────────────────────────────
       - name: Self-Review (fresh context)
         if: steps.agent.outcome == 'success'
-        run: uv run ralph-review
+        run: uv run clanker-review
         env:
           PR_NUMBER: ${{ steps.agent.outputs.pr_number }}
           BRANCH: ${{ steps.agent.outputs.branch }}

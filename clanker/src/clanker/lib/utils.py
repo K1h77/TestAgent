@@ -2,7 +2,7 @@ import logging
 import subprocess
 from pathlib import Path
 
-logger = logging.getLogger("ralph-agent")
+logger = logging.getLogger("clanker-agent")
 
 
 def get_git_diff(repo_root: Path) -> str:

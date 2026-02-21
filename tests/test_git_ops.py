@@ -4,7 +4,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from ralph.lib.git_ops import (
+from clanker.lib.git_ops import (
     create_branch,
     commit_and_push,
     create_pr,
@@ -26,7 +26,7 @@ class TestCreateBranch:
         with pytest.raises(ValueError, match="empty"):
             create_branch(None)
 
-    @patch("ralph.lib.git_ops._run_git")
+    @patch("clanker.lib.git_ops._run_git")
     def test_calls_git_checkout_new_branch(self, mock_git):
         """When branch does not exist on remote, should create it with -b."""
 
@@ -41,15 +41,15 @@ class TestCreateBranch:
             return result
 
         mock_git.side_effect = side_effect
-        actual_branch = create_branch("ralph/issue-42")
+        actual_branch = create_branch("clanker/issue-42")
 
-        assert actual_branch == "ralph/issue-42"
+        assert actual_branch == "clanker/issue-42"
         calls = [c.args[0] for c in mock_git.call_args_list]
         assert ["fetch", "origin"] in calls
-        assert ["ls-remote", "--heads", "origin", "ralph/issue-42"] in calls
-        assert ["checkout", "-b", "ralph/issue-42"] in calls
+        assert ["ls-remote", "--heads", "origin", "clanker/issue-42"] in calls
+        assert ["checkout", "-b", "clanker/issue-42"] in calls
 
-    @patch("ralph.lib.git_ops._run_git")
+    @patch("clanker.lib.git_ops._run_git")
     def test_creates_versioned_branch_when_base_exists(self, mock_git):
         """When branch already exists on remote, should create -v2 version."""
 
@@ -59,29 +59,29 @@ class TestCreateBranch:
             if args[0] == "ls-remote":
                 # First call: base branch exists
                 # Second call: -v2 does not exist
-                if "ralph/issue-42-v2" in args:
+                if "clanker/issue-42-v2" in args:
                     result.stdout = ""
                 else:
-                    result.stdout = "abc123\trefs/heads/ralph/issue-42\n"
+                    result.stdout = "abc123\trefs/heads/clanker/issue-42\n"
             else:
                 result.stdout = ""
             return result
 
         mock_git.side_effect = side_effect
-        actual_branch = create_branch("ralph/issue-42")
+        actual_branch = create_branch("clanker/issue-42")
 
-        assert actual_branch == "ralph/issue-42-v2"
+        assert actual_branch == "clanker/issue-42-v2"
         calls = [c.args[0] for c in mock_git.call_args_list]
-        assert ["checkout", "-b", "ralph/issue-42-v2"] in calls
+        assert ["checkout", "-b", "clanker/issue-42-v2"] in calls
         # Should NOT try to checkout/reset the existing branch
-        assert ["checkout", "ralph/issue-42"] not in calls
-        assert ["reset", "--hard", "origin/ralph/issue-42"] not in calls
+        assert ["checkout", "clanker/issue-42"] not in calls
+        assert ["reset", "--hard", "origin/clanker/issue-42"] not in calls
 
-    @patch("ralph.lib.git_ops._run_git")
+    @patch("clanker.lib.git_ops._run_git")
     def test_git_failure_raises(self, mock_git):
         mock_git.side_effect = GitError("branch exists", exit_code=128)
         with pytest.raises(GitError):
-            create_branch("ralph/issue-42")
+            create_branch("clanker/issue-42")
 
 
 class TestCommitAndPush:
@@ -95,7 +95,7 @@ class TestCommitAndPush:
         with pytest.raises(ValueError, match="Branch name"):
             commit_and_push("message", "")
 
-    @patch("ralph.lib.git_ops._run_git")
+    @patch("clanker.lib.git_ops._run_git")
     def test_no_changes_raises(self, mock_git):
         """If git status --porcelain returns empty, should raise GitError."""
 
@@ -112,9 +112,9 @@ class TestCommitAndPush:
         mock_git.side_effect = side_effect
 
         with pytest.raises(GitError, match="No changes"):
-            commit_and_push("fix stuff", "ralph/issue-1")
+            commit_and_push("fix stuff", "clanker/issue-1")
 
-    @patch("ralph.lib.git_ops._run_git")
+    @patch("clanker.lib.git_ops._run_git")
     def test_successful_commit_and_push(self, mock_git):
         """Should call git add, check status, commit, and push (check=False)."""
 
@@ -126,15 +126,15 @@ class TestCommitAndPush:
             return result
 
         mock_git.side_effect = side_effect
-        commit_and_push("fix bug", "ralph/issue-1")
+        commit_and_push("fix bug", "clanker/issue-1")
 
         calls = [c.args[0] for c in mock_git.call_args_list]
         assert ["add", "-A"] in calls
         assert ["status", "--porcelain"] in calls
         assert ["commit", "-m", "fix bug"] in calls
-        assert ["push", "origin", "ralph/issue-1"] in calls
+        assert ["push", "origin", "clanker/issue-1"] in calls
 
-    @patch("ralph.lib.git_ops._run_git")
+    @patch("clanker.lib.git_ops._run_git")
     def test_push_retries_after_non_fast_forward(self, mock_git):
         """On non-fast-forward push rejection, should pull --rebase then retry push."""
         push_attempt = 0
@@ -157,15 +157,15 @@ class TestCommitAndPush:
             return result
 
         mock_git.side_effect = side_effect
-        commit_and_push("fix bug", "ralph/issue-1")
+        commit_and_push("fix bug", "clanker/issue-1")
 
         calls = [c.args[0] for c in mock_git.call_args_list]
         # Should have attempted a pull --rebase after rejection
-        assert ["pull", "--rebase", "origin", "ralph/issue-1"] in calls
+        assert ["pull", "--rebase", "origin", "clanker/issue-1"] in calls
         # And pushed a second time
         assert push_attempt == 2
 
-    @patch("ralph.lib.git_ops._run_git")
+    @patch("clanker.lib.git_ops._run_git")
     def test_non_fast_forward_raises_after_rebase_fails(self, mock_git):
         """If the retry push also fails, should raise GitError."""
         call_count = {"push": 0}
@@ -187,7 +187,7 @@ class TestCommitAndPush:
 
         mock_git.side_effect = side_effect2
         with pytest.raises(GitError):
-            commit_and_push("fix bug", "ralph/issue-1")
+            commit_and_push("fix bug", "clanker/issue-1")
 
 
 class TestCreatePr:
@@ -201,20 +201,20 @@ class TestCreatePr:
         with pytest.raises(ValueError, match="head"):
             create_pr("title", "body", "main", "")
 
-    @patch("ralph.lib.git_ops._run_gh")
+    @patch("clanker.lib.git_ops._run_gh")
     def test_returns_pr_url(self, mock_gh):
         mock_gh.return_value = MagicMock(
             stdout="https://github.com/user/repo/pull/42\n",
             returncode=0,
         )
-        url = create_pr("Fix bug", "Description", "main", "ralph/issue-42")
+        url = create_pr("Fix bug", "Description", "main", "clanker/issue-42")
         assert url == "https://github.com/user/repo/pull/42"
 
-    @patch("ralph.lib.git_ops._run_gh")
+    @patch("clanker.lib.git_ops._run_gh")
     def test_empty_url_raises(self, mock_gh):
         mock_gh.return_value = MagicMock(stdout="", returncode=0)
         with pytest.raises(GitError, match="no URL"):
-            create_pr("Fix bug", "Description", "main", "ralph/issue-42")
+            create_pr("Fix bug", "Description", "main", "clanker/issue-42")
 
 
 class TestGetPrNumber:
@@ -230,7 +230,7 @@ class TestGetPrNumber:
 class TestGetDiff:
     """Tests for get_diff()."""
 
-    @patch("ralph.lib.git_ops._run_git")
+    @patch("clanker.lib.git_ops._run_git")
     def test_returns_diff_string(self, mock_git):
         mock_git.return_value = MagicMock(stdout="diff --git a/file.js b/file.js\n")
         result = get_diff("main")
@@ -240,13 +240,13 @@ class TestGetDiff:
 class TestGetChangedFiles:
     """Tests for get_changed_files()."""
 
-    @patch("ralph.lib.git_ops._run_git")
+    @patch("clanker.lib.git_ops._run_git")
     def test_returns_file_list(self, mock_git):
         mock_git.return_value = MagicMock(stdout="server.js\napp.js\n")
         files = get_changed_files("main")
         assert files == ["server.js", "app.js"]
 
-    @patch("ralph.lib.git_ops._run_git")
+    @patch("clanker.lib.git_ops._run_git")
     def test_empty_diff_returns_empty_list(self, mock_git):
         mock_git.return_value = MagicMock(stdout="")
         files = get_changed_files("main")

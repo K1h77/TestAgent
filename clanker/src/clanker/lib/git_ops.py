@@ -79,7 +79,7 @@ def _run_gh(args: list[str]) -> subprocess.CompletedProcess:
 
 
 def configure_git_user(
-    name: str = "Ralph Bot", email: str = "ralph-bot@users.noreply.github.com"
+    name: str = "Ralph Bot", email: str = "clanker-bot@users.noreply.github.com"
 ) -> None:
     """Configure git user for commits.
 
@@ -239,7 +239,7 @@ def create_pr(title: str, body: str, base: str, head: str) -> str:
         title: PR title.
         body: PR body (markdown).
         base: Base branch (e.g., 'main').
-        head: Head branch (e.g., 'ralph/issue-42').
+        head: Head branch (e.g., 'clanker/issue-42').
 
     Returns:
         PR URL.

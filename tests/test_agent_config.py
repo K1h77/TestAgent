@@ -3,7 +3,7 @@
 import pytest
 from pathlib import Path
 
-from ralph.lib.agent_config import (
+from clanker.lib.agent_config import (
     load_config,
     AgentConfig,
     Models,

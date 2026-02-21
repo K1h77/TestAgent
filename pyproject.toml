@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ralph-agent"
+name = "clanker-agent"
 version = "0.1.0"
 description = "Autonomous GitHub issue resolution agent using Cline CLI"
 requires-python = ">=3.12"
@@ -15,15 +15,15 @@ dependencies = [
 ]
 
 [project.scripts]
-ralph-agent  = "ralph.ralph_agent:main"
-ralph-review = "ralph.self_review:main"
+clanker-agent  = "clanker.ralph_agent:main"
+clanker-review = "clanker.self_review:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["ralph"]
+packages = ["clanker"]
 
 [tool.hatch.build.targets.wheel.shared-data]
-"ralph/prompts"      = "ralph/prompts"
-"ralph/cline-config" = "ralph/cline-config"
+"clanker/prompts"      = "clanker/prompts"
+"clanker/cline-config" = "clanker/cline-config"
 
 [tool.uv]
 dev-dependencies = [

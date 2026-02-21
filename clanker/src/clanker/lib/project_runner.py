@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from clanker.lib.agent_config import ServerConfig
 
-logger = logging.getLogger("ralph-agent")
+logger = logging.getLogger("clanker-agent")
 
 _FRONTEND_GLOBS = [
     "*.html",

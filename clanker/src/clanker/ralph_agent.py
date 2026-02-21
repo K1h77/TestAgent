@@ -25,7 +25,7 @@ from clanker.lib.logging_config import setup_logging, format_summary
 from clanker.lib.screenshot import take_after_screenshot_with_review, embed_screenshots_markdown
 from clanker.lib.utils import get_git_diff, get_repo_name
 
-logger = logging.getLogger("ralph-agent")
+logger = logging.getLogger("clanker-agent")
 
 
 def _resolve_repo_root() -> Path:
@@ -70,7 +70,7 @@ def setup_git_branch(issue) -> str:
     configure_git_user()
 
     slug = re.sub(r"[^a-z0-9]+", "-", issue.title.lower()).strip("-")[:50].rstrip("-")
-    desired_branch = f"ralph/issue-{issue.number}-{slug}"
+    desired_branch = f"clanker/issue-{issue.number}-{slug}"
     branch = create_branch(desired_branch)
     logger.info(f"Branch created: {branch}")
     return branch

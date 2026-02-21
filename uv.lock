@@ -5,7 +5,7 @@ requires-python = ">=3.14"
 [manifest]
 members = [
     "clanker",
-    "ralph-agent",
+    "clanker-agent",
 ]
 
 [[package]]
@@ -193,7 +193,7 @@ wheels = [
 ]
 
 [[package]]
-name = "ralph-agent"
+name = "clanker-agent"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

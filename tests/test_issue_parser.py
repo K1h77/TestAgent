@@ -192,10 +192,10 @@ class TestReviewSettings:
 
     def test_loads_from_env(self, monkeypatch):
         monkeypatch.setenv("PR_NUMBER", "99")
-        monkeypatch.setenv("BRANCH", "ralph/issue-42-fix")
+        monkeypatch.setenv("BRANCH", "clanker/issue-42-fix")
         settings = ReviewSettings()
         assert settings.pr_number == "99"
-        assert settings.branch == "ralph/issue-42-fix"
+        assert settings.branch == "clanker/issue-42-fix"
 
     def test_raises_when_missing(self, monkeypatch):
         monkeypatch.delenv("PR_NUMBER", raising=False)

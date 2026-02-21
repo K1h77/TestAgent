@@ -4,7 +4,7 @@ Provides a single cached AgentConfig object with typed accessors so that
 every script reads from the same central config file without redundant I/O.
 
 Usage:
-    from ralph.lib.agent_config import load_config
+    from clanker.lib.agent_config import load_config
 
     cfg = load_config()
     cfg.models.coder_default       # "deepseek/deepseek-v3.2"

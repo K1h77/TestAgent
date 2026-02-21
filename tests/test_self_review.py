@@ -1,7 +1,7 @@
 """Tests for self_review — parse_verdict and frontend-gating behaviour.
 
 parse_verdict is extracted here to avoid importing the top-level self_review
-module (which pulls in ralph.lib.agent_config → pyyaml at import time and
+module (which pulls in clanker.lib.agent_config → pyyaml at import time and
 would fail in environments without the full dependency set installed).
 """
 
@@ -115,19 +115,19 @@ class TestVisualVerdictGating:
         return mock_rvv(path) if issue.is_frontend() else None
 
     def _frontend_issue(self):
-        from ralph.lib.issue_parser import parse_issue
+        from clanker.lib.issue_parser import parse_issue
 
         return parse_issue(
             "1", "Fix button colour", "Button is wrong", labels="frontend"
         )
 
     def _backend_issue(self):
-        from ralph.lib.issue_parser import parse_issue
+        from clanker.lib.issue_parser import parse_issue
 
         return parse_issue("2", "Fix API timeout", "Times out", labels="backend,bug")
 
     def _unlabelled_issue(self):
-        from ralph.lib.issue_parser import parse_issue
+        from clanker.lib.issue_parser import parse_issue
 
         return parse_issue("3", "Some task", "Some description")
 
@@ -150,7 +150,7 @@ class TestVisualVerdictGating:
         assert result is None
 
     def test_frontend_among_many_labels_still_triggers(self, tmp_path):
-        from ralph.lib.issue_parser import parse_issue
+        from clanker.lib.issue_parser import parse_issue
 
         issue = parse_issue("4", "Title", "Body", labels="bug,frontend,ui")
         mock_rvv = MagicMock(return_value="OK")

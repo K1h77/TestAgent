@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Ralph Agent** — an autonomous GitHub issue resolution system. When an issue is labeled `ralph-autofix`, it reads the issue, creates a branch, drives Cline CLI through a TDD loop, takes before/after screenshots (for frontend issues), commits changes, opens a PR, and runs a self-review cycle.
+**Ralph Agent** — an autonomous GitHub issue resolution system. When an issue is labeled `clanker-autofix`, it reads the issue, creates a branch, drives Cline CLI through a TDD loop, takes before/after screenshots (for frontend issues), commits changes, opens a PR, and runs a self-review cycle.
 
 Everything outside `.github/` is a **placeholder testbed** (simple Node.js/Express task manager) used to test the agent. The real code lives in `.github/`.
 
@@ -71,8 +71,8 @@ The pipeline has two phases, each a separate Python entry point:
 
 ### CI/CD (`.github/workflows/`)
 
-- **`ralph-dispatch.yml`** — Triggered by `issues: [labeled]`. If label is `ralph-autofix`, removes it (prevents re-trigger) and dispatches the main workflow.
-- **`ralph-autofix.yml`** — `workflow_dispatch` on `ubuntu-latest`, 90-minute timeout. Requires `OPENROUTER_API_KEY` secret. Steps: checkout → setup Node 22 + Python 3.12 → install deps → validate API key → syntax-check + pytest → run `ralph_agent.py` → scrub secrets → upload screenshots → run `self_review.py`.
+- **`clanker-dispatch.yml`** — Triggered by `issues: [labeled]`. If label is `clanker-autofix`, removes it (prevents re-trigger) and dispatches the main workflow.
+- **`clanker-autofix.yml`** — `workflow_dispatch` on `ubuntu-latest`, 90-minute timeout. Requires `OPENROUTER_API_KEY` secret. Steps: checkout → setup Node 22 + Python 3.12 → install deps → validate API key → syntax-check + pytest → run `ralph_agent.py` → scrub secrets → upload screenshots → run `self_review.py`.
 
 ### Models (via OpenRouter, not Anthropic direct)
 

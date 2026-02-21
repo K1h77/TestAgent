@@ -33,7 +33,7 @@ choco install jq curl
 ```
 
 Installs:
-- `jq` - JSON processor (required by ralph.sh and pre-process-issue.sh)
+- `jq` - JSON processor (required by clanker.sh and pre-process-issue.sh)
 - `curl` - HTTP client (required for API calls)
 - `perl` - Text processing (required by pre-process-issue.sh)
 
@@ -65,7 +65,7 @@ Installs:
 ## CI/CD
 
 GitHub Actions automatically installs all dependencies from these files in both workflows:
-- `.github/workflows/ralph.yaml` - Production agent runs
+- `.github/workflows/clanker.yaml` - Production agent runs
 - `.github/workflows/test.yml` - Test suite runs
 
 Installation order: System packages → Python packages → Node.js packages
