@@ -10,6 +10,8 @@ requires-python = ">=3.12"
 dependencies = [
     "pyyaml>=6.0",
     "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "clanker",
 ]
 
 [project.scripts]
@@ -27,6 +29,9 @@ packages = ["ralph"]
 dev-dependencies = [
     "pytest>=8.0",
 ]
+
+[tool.uv.sources]
+clanker = { workspace = true }
 
 [tool.uv.workspace]
 members = [

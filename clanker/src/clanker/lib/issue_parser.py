@@ -4,7 +4,6 @@ Every field is validated. Missing or invalid data raises ValueError
 immediately rather than allowing the agent to proceed with bad input.
 """
 
-import os
 from dataclasses import dataclass, field
 
 
@@ -20,27 +19,6 @@ class Issue:
     def is_frontend(self) -> bool:
         """Return True if the issue is tagged with the 'frontend' label."""
         return "frontend" in self.labels
-
-
-def require_env(name: str) -> str:
-    """Get a required environment variable or raise immediately.
-
-    Args:
-        name: Environment variable name.
-
-    Returns:
-        The value of the environment variable.
-
-    Raises:
-        ValueError: If the variable is missing or empty.
-    """
-    value = os.environ.get(name)
-    if not value or not value.strip():
-        raise ValueError(
-            f"Required environment variable '{name}' is missing or empty. "
-            f"Check your GitHub Actions workflow configuration."
-        )
-    return value.strip()
 
 
 def parse_issue(number: str, title: str, body: str, labels: str = "") -> Issue:

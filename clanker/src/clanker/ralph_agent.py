@@ -19,7 +19,8 @@ from clanker.lib.git_ops import (
     post_issue_comment,
     GitError,
 )
-from clanker.lib.issue_parser import parse_issue, require_env
+from clanker.lib.env_settings import IssueSettings, ApiSettings
+from clanker.lib.issue_parser import parse_issue
 from clanker.lib.logging_config import setup_logging, format_summary
 from clanker.lib.screenshot import take_after_screenshot_with_review, embed_screenshots_markdown
 from clanker.lib.utils import get_git_diff, get_repo_name
@@ -46,13 +47,15 @@ CODING_TIMEOUT = _cfg.timeouts.coding_seconds
 
 
 def validate_inputs():
+    env = IssueSettings()
+    ApiSettings()  # validates OPENROUTER_API_KEY is set
+
     issue = parse_issue(
-        number=require_env("ISSUE_NUMBER"),
-        title=require_env("ISSUE_TITLE"),
-        body=require_env("ISSUE_BODY"),
-        labels=os.environ.get("ISSUE_LABELS", ""),
+        number=env.issue_number,
+        title=env.issue_title,
+        body=env.issue_body,
+        labels=env.issue_labels,
     )
-    require_env("OPENROUTER_API_KEY")
 
     logger.info(f"Issue #{issue.number}: {issue.title}")
     logger.info(f"Issue body: {issue.body[:200]}...")

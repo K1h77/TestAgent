@@ -1,8 +1,10 @@
 """Tests for issue_parser module."""
 
 import pytest
+from pydantic import ValidationError
 
-from ralph.lib.issue_parser import parse_issue, require_env, Issue
+from clanker.lib.issue_parser import parse_issue, Issue
+from clanker.lib.env_settings import IssueSettings, ApiSettings, ReviewSettings
 
 
 class TestParseIssue:
@@ -142,28 +144,61 @@ class TestIssueLabels:
             issue.labels = frozenset({"other"})
 
 
-class TestRequireEnv:
-    """Tests for require_env()."""
+class TestIssueSettings:
+    """Tests for IssueSettings pydantic model."""
 
-    def test_returns_value_when_set(self, monkeypatch):
-        monkeypatch.setenv("TEST_VAR_123", "hello")
-        assert require_env("TEST_VAR_123") == "hello"
+    def test_loads_from_env(self, monkeypatch):
+        monkeypatch.setenv("ISSUE_NUMBER", "42")
+        monkeypatch.setenv("ISSUE_TITLE", "Fix bug")
+        monkeypatch.setenv("ISSUE_BODY", "Description")
+        settings = IssueSettings()
+        assert settings.issue_number == "42"
+        assert settings.issue_title == "Fix bug"
+        assert settings.issue_body == "Description"
+        assert settings.issue_labels == ""
 
-    def test_strips_whitespace(self, monkeypatch):
-        monkeypatch.setenv("TEST_VAR_123", "  hello  ")
-        assert require_env("TEST_VAR_123") == "hello"
+    def test_loads_labels(self, monkeypatch):
+        monkeypatch.setenv("ISSUE_NUMBER", "1")
+        monkeypatch.setenv("ISSUE_TITLE", "T")
+        monkeypatch.setenv("ISSUE_BODY", "B")
+        monkeypatch.setenv("ISSUE_LABELS", "frontend,bug")
+        settings = IssueSettings()
+        assert settings.issue_labels == "frontend,bug"
+
+    def test_raises_when_required_missing(self, monkeypatch):
+        monkeypatch.delenv("ISSUE_NUMBER", raising=False)
+        monkeypatch.delenv("ISSUE_TITLE", raising=False)
+        monkeypatch.delenv("ISSUE_BODY", raising=False)
+        with pytest.raises(ValidationError):
+            IssueSettings()
+
+
+class TestApiSettings:
+    """Tests for ApiSettings pydantic model."""
+
+    def test_loads_from_env(self, monkeypatch):
+        monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test-123")
+        settings = ApiSettings()
+        assert settings.openrouter_api_key == "sk-test-123"
 
     def test_raises_when_missing(self, monkeypatch):
-        monkeypatch.delenv("TEST_MISSING_VAR_XYZ", raising=False)
-        with pytest.raises(ValueError, match="TEST_MISSING_VAR_XYZ"):
-            require_env("TEST_MISSING_VAR_XYZ")
+        monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+        with pytest.raises(ValidationError):
+            ApiSettings()
 
-    def test_raises_when_empty(self, monkeypatch):
-        monkeypatch.setenv("TEST_VAR_123", "")
-        with pytest.raises(ValueError, match="TEST_VAR_123"):
-            require_env("TEST_VAR_123")
 
-    def test_raises_when_whitespace_only(self, monkeypatch):
-        monkeypatch.setenv("TEST_VAR_123", "   ")
-        with pytest.raises(ValueError, match="TEST_VAR_123"):
-            require_env("TEST_VAR_123")
+class TestReviewSettings:
+    """Tests for ReviewSettings pydantic model."""
+
+    def test_loads_from_env(self, monkeypatch):
+        monkeypatch.setenv("PR_NUMBER", "99")
+        monkeypatch.setenv("BRANCH", "ralph/issue-42-fix")
+        settings = ReviewSettings()
+        assert settings.pr_number == "99"
+        assert settings.branch == "ralph/issue-42-fix"
+
+    def test_raises_when_missing(self, monkeypatch):
+        monkeypatch.delenv("PR_NUMBER", raising=False)
+        monkeypatch.delenv("BRANCH", raising=False)
+        with pytest.raises(ValidationError):
+            ReviewSettings()

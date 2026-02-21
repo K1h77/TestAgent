@@ -7,7 +7,9 @@ authors = [
     { name = "Jakob Lindner", email = "lindnerjakob0@gmail.com" }
 ]
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "pydantic-settings>=2.0",
+]
 
 [project.scripts]
 clanker = "clanker:main"

@@ -30,7 +30,8 @@ from clanker.lib.git_ops import (
     label_pr,
     GitError,
 )
-from clanker.lib.issue_parser import parse_issue, require_env
+from clanker.lib.env_settings import IssueSettings, ApiSettings, ReviewSettings
+from clanker.lib.issue_parser import parse_issue
 from clanker.lib.logging_config import setup_logging, format_review_summary
 from clanker.lib.project_runner import run_tests
 from clanker.lib.prompt_utils import load_prompt_template, get_default_prompts_dir
@@ -175,16 +176,18 @@ def main() -> None:
     # Snapshot OpenRouter usage at start for review cost tracking
     _cost_baseline = get_openrouter_usage()
     # ── 1. Validate inputs ──────────────────────────────────────
-    issue = parse_issue(
-        number=require_env("ISSUE_NUMBER"),
-        title=require_env("ISSUE_TITLE"),
-        body=require_env("ISSUE_BODY"),
-        labels=os.environ.get("ISSUE_LABELS", ""),
-    )
-    pr_number = require_env("PR_NUMBER")
-    branch = require_env("BRANCH")
+    env = IssueSettings()
+    review_env = ReviewSettings()
+    ApiSettings()  # validates OPENROUTER_API_KEY is set
 
-    require_env("OPENROUTER_API_KEY")
+    issue = parse_issue(
+        number=env.issue_number,
+        title=env.issue_title,
+        body=env.issue_body,
+        labels=env.issue_labels,
+    )
+    pr_number = review_env.pr_number
+    branch = review_env.branch
 
     logger.info(f"Reviewing PR #{pr_number} for issue #{issue.number}")
 
