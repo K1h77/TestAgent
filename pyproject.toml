@@ -27,3 +27,8 @@ packages = ["ralph"]
 dev-dependencies = [
     "pytest>=8.0",
 ]
+
+[tool.uv.workspace]
+members = [
+    "clanker",
+]
