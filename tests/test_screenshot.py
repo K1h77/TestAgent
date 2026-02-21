@@ -2,9 +2,7 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from lib.screenshot import (
+from ralph.lib.screenshot import (
     take_screenshot,
     embed_screenshots_markdown,
     _to_relative_path,
@@ -13,7 +11,7 @@ from lib.screenshot import (
     _parse_selected_paths,
     _fallback_screenshot_selection,
 )
-from lib.cline_runner import ClineError
+from ralph.lib.cline_runner import ClineError
 
 
 class TestTakeScreenshot:
@@ -74,7 +72,7 @@ class TestTakeScreenshot:
         mock_cline = MagicMock()
         mock_cline.run.side_effect = save_differently
 
-        with patch("lib.screenshot.logger") as mock_logger:
+        with patch("ralph.lib.screenshot.logger") as mock_logger:
             result = take_screenshot(mock_cline, output_path)
             # Should rename switch.png → before.png and return the path
             assert result == output_path

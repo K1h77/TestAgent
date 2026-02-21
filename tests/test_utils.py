@@ -1,15 +1,8 @@
-import sys
+import pytest
 from pathlib import Path
 
-import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from lib.utils import (
-    load_prompt_template,
-    screenshot_relative_path,
-    read_visual_verdict,
-)
+from ralph.lib.prompt_utils import load_prompt_template
+from ralph.lib.screenshot import screenshot_relative_path, read_visual_verdict
 
 
 class TestLoadPromptTemplate:

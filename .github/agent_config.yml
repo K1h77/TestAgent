@@ -50,3 +50,19 @@ timeouts:
 
   # Seconds allowed for `npm test` runs (2 min)
   test_seconds: 120
+
+project:
+  # Base branch to diff against and create PRs into
+  base_branch: "main"
+
+  # Command used to run the test suite
+  test_command: "npm test"
+
+  server:
+    # Set to true for frontend issues that require a running dev server
+    enabled: false
+    install_command: "npm ci"
+    start_command: "node server.js"
+    working_dir: "backend"
+    port: 3000
+    health_path: "/"

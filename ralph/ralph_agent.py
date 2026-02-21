@@ -6,20 +6,11 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
-
-from lib.agent_config import load_config
-from lib.cline_runner import ClineRunner, ClineError, get_openrouter_usage
-from lib.utils import (
-    get_git_diff,
-    get_frontend_diff,
-    get_repo_name,
-    load_prompt_template,
-    run_tests,
-    start_server,
-    stop_server,
-)
-from lib.git_ops import (
+from ralph.lib.agent_config import load_config
+from ralph.lib.cline_runner import ClineRunner, ClineError, get_openrouter_usage
+from ralph.lib.project_runner import run_tests, start_server, stop_server, get_frontend_diff
+from ralph.lib.prompt_utils import load_prompt_template, get_default_prompts_dir
+from ralph.lib.git_ops import (
     configure_git_user,
     create_branch,
     commit_and_push,
@@ -28,16 +19,25 @@ from lib.git_ops import (
     post_issue_comment,
     GitError,
 )
-from lib.issue_parser import parse_issue, require_env
-from lib.logging_config import setup_logging, format_summary
-from lib.screenshot import take_after_screenshot_with_review, embed_screenshots_markdown
+from ralph.lib.issue_parser import parse_issue, require_env
+from ralph.lib.logging_config import setup_logging, format_summary
+from ralph.lib.screenshot import take_after_screenshot_with_review, embed_screenshots_markdown
+from ralph.lib.utils import get_git_diff, get_repo_name
 
 logger = logging.getLogger("ralph-agent")
 
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-SCRIPTS_DIR = Path(__file__).resolve().parent
-MCP_SETTINGS_PATH = SCRIPTS_DIR / "cline-config" / "cline_mcp_settings.json"
-PROMPTS_DIR = SCRIPTS_DIR / "prompts"
+
+def _resolve_repo_root() -> Path:
+    env = os.environ.get("RALPH_REPO_ROOT")
+    if env:
+        return Path(env)
+    return Path.cwd()
+
+
+REPO_ROOT = _resolve_repo_root()
+PACKAGE_DIR = Path(__file__).resolve().parent
+MCP_SETTINGS_PATH = PACKAGE_DIR / "cline-config" / "cline_mcp_settings.json"
+PROMPTS_DIR = get_default_prompts_dir()
 SCREENSHOTS_DIR = REPO_ROOT / "screenshots"
 
 _cfg = load_config()
@@ -109,7 +109,7 @@ def configure_runners(issue):
 
 def start_server_if_frontend_issue(issue):
     if issue.is_frontend():
-        return start_server(REPO_ROOT)
+        return start_server(REPO_ROOT, _cfg.project.server)
     logger.info("Skipping server start and screenshots (not a frontend issue)")
     return None
 
@@ -151,7 +151,9 @@ def coding_loop(issue, is_hard, default_cline, hard_cline) -> tuple[bool, int]:
             )
         else:
             diff = get_git_diff(REPO_ROOT)
-            test_ok, test_output = run_tests(REPO_ROOT, _cfg.timeouts.test_seconds)
+            test_ok, test_output = run_tests(
+                REPO_ROOT, _cfg.timeouts.test_seconds, _cfg.project.test_command
+            )
 
             if test_ok:
                 tests_passed = True
@@ -176,7 +178,7 @@ def coding_loop(issue, is_hard, default_cline, hard_cline) -> tuple[bool, int]:
             continue
 
     if not tests_passed:
-        success, _ = run_tests(REPO_ROOT, _cfg.timeouts.test_seconds)
+        success, _ = run_tests(REPO_ROOT, _cfg.timeouts.test_seconds, _cfg.project.test_command)
         if success:
             tests_passed = True
             logger.info("Tests passed after final attempt")
@@ -197,9 +199,9 @@ def take_after_screenshots(issue, vision_cline, server):
     logger.info("Taking 'after' screenshots with visual review...")
     stop_server(server)
     time.sleep(2)
-    server = start_server(REPO_ROOT)
+    server = start_server(REPO_ROOT, _cfg.project.server)
 
-    frontend_diff = get_frontend_diff(REPO_ROOT)
+    frontend_diff = get_frontend_diff(REPO_ROOT, _cfg.project.base_branch)
     logger.info(f"Frontend diff for visual review: {len(frontend_diff)} chars")
 
     after_paths, _ = take_after_screenshot_with_review(
@@ -282,7 +284,7 @@ def build_and_create_pr(
     pr_url = create_pr(
         title=f"fix(#{issue.number}): {issue.title}",
         body=pr_body,
-        base="main",
+        base=_cfg.project.base_branch,
         head=branch,
     )
 

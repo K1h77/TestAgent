@@ -1,12 +1,8 @@
 """Tests for issue_parser module."""
 
 import pytest
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from lib.issue_parser import parse_issue, require_env, Issue
+from ralph.lib.issue_parser import parse_issue, require_env, Issue
 
 
 class TestParseIssue:

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ralph-agent"
+version = "0.1.0"
+description = "Autonomous GitHub issue resolution agent using Cline CLI"
+requires-python = ">=3.12"
+dependencies = [
+    "pyyaml>=6.0",
+    "pydantic>=2.0",
+]
+
+[project.scripts]
+ralph-agent  = "ralph.ralph_agent:main"
+ralph-review = "ralph.self_review:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ralph"]
+
+[tool.hatch.build.targets.wheel.shared-data]
+"ralph/prompts"      = "ralph/prompts"
+"ralph/cline-config" = "ralph/cline-config"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0",
+]

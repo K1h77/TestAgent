@@ -2,13 +2,10 @@
 
 import json
 import pytest
-import sys
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from lib.cline_runner import (
+from ralph.lib.cline_runner import (
     ClineRunner,
     ClineResult,
     ClineError,

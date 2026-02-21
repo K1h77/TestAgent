@@ -42,6 +42,7 @@ jobs:
       ISSUE_LABELS: ${{ join(github.event.issue.labels.*.name, ',') || inputs.issue_labels }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RALPH_REPO_ROOT: ${{ github.workspace }}
 
     steps:
       # ── Environment Setup ─────────────────────────────────────
@@ -58,18 +59,21 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
 
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
       - name: Setup Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
-          cache-dependency-path: requirements.txt
 
       - name: Install project dependencies
         run: npm ci
 
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: uv sync
 
       - name: Install Cline CLI
         run: npm install -g cline@latest
@@ -104,16 +108,16 @@ jobs:
       # ── Run agent Python tests ────────────────────────────────
       - name: Check agent scripts for syntax errors
         run: |
-          find .github/scripts -name "*.py" | xargs python -m py_compile
+          find ralph tests -name "*.py" | xargs uv run python -m py_compile
           echo "All Python files passed syntax check."
 
       - name: Run agent unit tests
-        run: python -m pytest .github/scripts/tests/ -v --tb=short
+        run: uv run pytest tests/ -v --tb=short
 
       # ── Main Agent ────────────────────────────────────────────
       - name: Run Ralph Agent
         id: agent
-        run: python .github/scripts/ralph_agent.py
+        run: uv run ralph-agent
 
       # ── Scrub Cline working dirs (contain secrets.json) ───────
       # Runs immediately after the agent, before upload/review steps,
@@ -135,7 +139,7 @@ jobs:
       # ── Self-Review ───────────────────────────────────────────
       - name: Self-Review (fresh context)
         if: steps.agent.outcome == 'success'
-        run: python .github/scripts/self_review.py
+        run: uv run ralph-review
         env:
           PR_NUMBER: ${{ steps.agent.outputs.pr_number }}
           BRANCH: ${{ steps.agent.outputs.branch }}

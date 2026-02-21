@@ -11,21 +11,18 @@ only summaries are posted as PR comments.
 
 import logging
 import os
-import subprocess
+import re
 import sys
 from pathlib import Path
 
-# Add parent directory to path so lib/ is importable
-sys.path.insert(0, str(Path(__file__).parent))
-
-from lib.agent_config import load_config
-from lib.cline_runner import (
+from ralph.lib.agent_config import load_config
+from ralph.lib.cline_runner import (
     ClineRunner,
     ClineError,
     READ_ONLY_PERMISSIONS,
     get_openrouter_usage,
 )
-from lib.git_ops import (
+from ralph.lib.git_ops import (
     commit_and_push,
     get_diff,
     get_changed_files,
@@ -33,17 +30,27 @@ from lib.git_ops import (
     label_pr,
     GitError,
 )
-from lib.issue_parser import parse_issue, require_env
-from lib.logging_config import setup_logging, format_review_summary
-from lib.screenshot import read_visual_verdict
+from ralph.lib.issue_parser import parse_issue, require_env
+from ralph.lib.logging_config import setup_logging, format_review_summary
+from ralph.lib.project_runner import run_tests
+from ralph.lib.prompt_utils import load_prompt_template, get_default_prompts_dir
+from ralph.lib.screenshot import read_visual_verdict
 
 logger = logging.getLogger("self-review")
 
+
+def _resolve_repo_root() -> Path:
+    env = os.environ.get("RALPH_REPO_ROOT")
+    if env:
+        return Path(env)
+    return Path.cwd()
+
+
 # Constants
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-SCRIPTS_DIR = Path(__file__).resolve().parent
-MCP_SETTINGS_PATH = SCRIPTS_DIR / "cline-config" / "cline_mcp_settings.json"
-PROMPTS_DIR = SCRIPTS_DIR / "prompts"
+REPO_ROOT = _resolve_repo_root()
+PACKAGE_DIR = Path(__file__).resolve().parent
+MCP_SETTINGS_PATH = PACKAGE_DIR / "cline-config" / "cline_mcp_settings.json"
+PROMPTS_DIR = get_default_prompts_dir()
 SCREENSHOTS_DIR = REPO_ROOT / "screenshots"
 
 # Load central config from .github/agent_config.yml
@@ -51,18 +58,6 @@ _cfg = load_config()
 MAX_REVIEW_ITERATIONS = _cfg.retries.max_review_iterations
 REVIEW_TIMEOUT = _cfg.timeouts.review_seconds
 FIX_TIMEOUT = _cfg.timeouts.fix_seconds
-
-
-def load_template(name: str, **kwargs: str) -> str:
-    """Load a prompt template and substitute placeholders."""
-    path = PROMPTS_DIR / name
-    if not path.exists():
-        raise FileNotFoundError(f"Prompt template not found: {path}")
-
-    content = path.read_text(encoding="utf-8")
-    for key, value in kwargs.items():
-        content = content.replace(f"{{{{{key}}}}}", str(value))
-    return content
 
 
 def parse_verdict(review_output: str) -> str:
@@ -77,8 +72,6 @@ def parse_verdict(review_output: str) -> str:
         'LGTM' or 'NEEDS CHANGES'. Defaults to 'LGTM' if no clear verdict
         is found (lenient — benefit of the doubt).
     """
-    import re
-
     # Strip markdown noise from each line before matching
     clean_output = re.sub(r"[*_`>#\-]", " ", review_output)
 
@@ -108,25 +101,6 @@ def parse_verdict(review_output: str) -> str:
     return "LGTM"
 
 
-def run_tests() -> tuple[bool, str]:
-    """Run the project test suite."""
-    logger.info("Running tests...")
-    try:
-        result = subprocess.run(
-            ["npm", "test"],
-            cwd=str(REPO_ROOT),
-            capture_output=True,
-            text=True,
-            timeout=_cfg.timeouts.test_seconds,
-        )
-        output = result.stdout + "\n" + result.stderr
-        return result.returncode == 0, output
-    except subprocess.TimeoutExpired:
-        msg = f"Tests timed out after {_cfg.timeouts.test_seconds}s"
-        logger.warning(msg)
-        return False, msg
-
-
 def self_heal_loop(fixer: ClineRunner, issue, max_attempts: int = 3) -> bool:
     """Run tests with self-healing fix attempts.
 
@@ -139,7 +113,9 @@ def self_heal_loop(fixer: ClineRunner, issue, max_attempts: int = 3) -> bool:
         True if tests pass, False otherwise.
     """
     for attempt in range(1, max_attempts + 1):
-        success, test_output = run_tests()
+        success, test_output = run_tests(
+            REPO_ROOT, _cfg.timeouts.test_seconds, _cfg.project.test_command
+        )
         if success:
             logger.info(f"Tests passed on heal attempt {attempt}")
             return True
@@ -147,7 +123,8 @@ def self_heal_loop(fixer: ClineRunner, issue, max_attempts: int = 3) -> bool:
         logger.warning(f"Tests failed (heal attempt {attempt}/{max_attempts})")
 
         if attempt < max_attempts:
-            heal_prompt = load_template(
+            heal_prompt = load_prompt_template(
+                PROMPTS_DIR,
                 "heal_prompt.md",
                 ISSUE_NUMBER=str(issue.number),
                 ISSUE_TITLE=issue.title,
@@ -227,8 +204,8 @@ def main() -> None:
         )
 
         # Gather diff context
-        diff = get_diff("main")
-        changed_files = get_changed_files("main")
+        diff = get_diff(_cfg.project.base_branch)
+        changed_files = get_changed_files(_cfg.project.base_branch)
 
         if not diff.strip():
             logger.warning("No diff found. Marking as passed.")
@@ -250,7 +227,8 @@ def main() -> None:
             diff = diff[:max_diff_len] + "\n\n... (diff truncated, see full diff in PR)"
             logger.info(f"Diff truncated from {original_len} to {max_diff_len} chars")
 
-        review_prompt = load_template(
+        review_prompt = load_prompt_template(
+            PROMPTS_DIR,
             "review_prompt.md",
             ISSUE_NUMBER=str(issue.number),
             ISSUE_TITLE=issue.title,
@@ -337,7 +315,8 @@ def main() -> None:
                 # No MCP settings — fixer uses CLI tools only, same as coding_cline.
             )
 
-            fix_prompt = load_template(
+            fix_prompt = load_prompt_template(
+                PROMPTS_DIR,
                 "review_fix_prompt.md",
                 ISSUE_NUMBER=str(issue.number),
                 ISSUE_TITLE=issue.title,

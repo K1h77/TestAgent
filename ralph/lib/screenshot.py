@@ -3,17 +3,86 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from lib.utils import load_prompt_template, screenshot_relative_path
+from ralph.lib.prompt_utils import load_prompt_template, get_default_prompts_dir
 
 logger = logging.getLogger(__name__)
 
-PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
-
-_to_relative_path = screenshot_relative_path
+PROMPTS_DIR = get_default_prompts_dir()
 
 
 class ScreenshotError(Exception):
     pass
+
+
+def screenshot_relative_path(path: Path) -> str:
+    """Extract path from 'screenshots/' onwards, falling back to filename."""
+    parts = Path(path).parts
+    for i, part in enumerate(parts):
+        if part == "screenshots":
+            return "/".join(parts[i:])
+    return Path(path).name
+
+
+# Keep private alias for backward compatibility
+_to_relative_path = screenshot_relative_path
+
+
+def embed_screenshots_markdown(
+    before_path: Optional[Path],
+    after_paths: list,
+    branch: str,
+    repo: str,
+) -> str:
+    """Generate markdown section with before/after screenshot images.
+
+    Args:
+        before_path: Path to before screenshot, or None.
+        after_paths: List of after screenshot paths.
+        branch: Git branch name (used in raw GitHub URL).
+        repo: Repo name in owner/name format.
+
+    Returns:
+        Markdown string with embedded images.
+    """
+    lines = ["### Screenshots", ""]
+
+    if before_path is None and not after_paths:
+        lines.append("*No screenshots captured.*")
+        return "\n".join(lines)
+
+    base_url = f"https://raw.githubusercontent.com/{repo}/{branch}"
+
+    if before_path is not None:
+        relative = screenshot_relative_path(before_path)
+        lines.append("**Before:**")
+        lines.append(f"![Before]({base_url}/{relative})")
+        lines.append("")
+
+    if after_paths:
+        lines.append("**After:**")
+        for i, p in enumerate(after_paths, 1):
+            relative = screenshot_relative_path(p)
+            label = f"After {i}" if len(after_paths) > 1 else "After"
+            lines.append(f"![{label}]({base_url}/{relative})")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def read_visual_verdict(screenshots_dir: Path) -> Optional[str]:
+    """Read the visual verdict file written by the after-screenshot review.
+
+    Args:
+        screenshots_dir: Directory containing visual_verdict.txt.
+
+    Returns:
+        Content of visual_verdict.txt, or None if missing/empty.
+    """
+    verdict_path = Path(screenshots_dir) / "visual_verdict.txt"
+    if not verdict_path.exists():
+        return None
+    content = verdict_path.read_text(encoding="utf-8").strip()
+    return content if content else None
 
 
 def _recover_misnamed_screenshot(output_path: Path) -> Optional[Path]:
