@@ -1,4 +1,4 @@
-"""Structured logging setup for Ralph Agent.
+"""Structured logging setup for clanker Agent.
 
 Provides verbose logging to stdout (for workflow logs) and a separate
 format_summary() function for concise markdown summaries posted to
@@ -53,14 +53,14 @@ def format_summary(details: dict) -> str:
     issue_number = details.get("issue_number", "?")
 
     if status == "started":
-        lines.append(f"**Ralph Agent** is working on issue #{issue_number}...")
+        lines.append(f"**clanker Agent** is working on issue #{issue_number}...")
         lines.append("")
         lines.append("I'll create a PR when the fix is ready.")
     elif status == "pr_created":
         pr_url = details.get("pr_url", "")
         tests_passed = details.get("tests_passed", False)
         coding_attempts = details.get("coding_attempts", 0)
-        lines.append(f"**Ralph Agent** has created a fix: {pr_url}")
+        lines.append(f"**clanker Agent** has created a fix: {pr_url}")
         lines.append("")
         test_status = "passing" if tests_passed else "partially passing"
         lines.append(f"- Tests: {test_status}")
@@ -68,11 +68,11 @@ def format_summary(details: dict) -> str:
             lines.append(f"- Coding attempts: {coding_attempts}")
     elif status == "failed":
         error = details.get("error", "Unknown error")
-        lines.append(f"**Ralph Agent** failed to fix issue #{issue_number}.")
+        lines.append(f"**clanker Agent** failed to fix issue #{issue_number}.")
         lines.append("")
         lines.append(f"Error: {error}")
     else:
-        lines.append(f"**Ralph Agent** — status: {status}")
+        lines.append(f"**clanker Agent** — status: {status}")
 
     return "\n".join(lines)
 
@@ -88,7 +88,7 @@ def format_review_summary(review_output: str, verdict: str) -> str:
         Markdown string for PR comment.
     """
     lines = [
-        f"## Ralph Self-Review — {verdict}",
+        f"## clanker Self-Review — {verdict}",
         "",
         "This review was performed by a **separate AI instance** with fresh context.",
         "",
@@ -107,6 +107,6 @@ def format_review_summary(review_output: str, verdict: str) -> str:
     lines.append(review_output)
     lines.append("")
     lines.append("---")
-    lines.append("*Automated review by Ralph Agent*")
+    lines.append("*Automated review by clanker Agent*")
 
     return "\n".join(lines)

@@ -24,7 +24,7 @@ class ApiSettings(BaseSettings):
 
 
 class ReviewSettings(BaseSettings):
-    """Self-review inputs from environment (output of ralph_agent step)."""
+    """Self-review inputs from environment (output of clanker_agent step)."""
 
     pr_number: str
     branch: str

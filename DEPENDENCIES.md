@@ -52,7 +52,7 @@ pip install -r requirements.txt
 ```
 
 Installs:
-- `aider-chat` - AI pair programming tool used by Ralph
+- `aider-chat` - AI pair programming tool used by clanker
 
 ## Dependency Files
 

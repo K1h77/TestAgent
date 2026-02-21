@@ -1,4 +1,4 @@
-name: Ralph Autofix Agent
+name: clanker Autofix Agent
 
 on:
   issues:
@@ -42,7 +42,7 @@ jobs:
       ISSUE_LABELS: ${{ join(github.event.issue.labels.*.name, ',') || inputs.issue_labels }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      RALPH_REPO_ROOT: ${{ github.workspace }}
+      clanker_REPO_ROOT: ${{ github.workspace }}
 
     steps:
       # ── Environment Setup ─────────────────────────────────────
@@ -115,7 +115,7 @@ jobs:
         run: uv run pytest tests/ -v --tb=short
 
       # ── Main Agent ────────────────────────────────────────────
-      - name: Run Ralph Agent
+      - name: Run clanker Agent
         id: agent
         run: uv run clanker-agent
 
@@ -150,9 +150,9 @@ jobs:
         if: failure()
         run: |
           gh issue comment "$ISSUE_NUMBER" \
-            --body "**Ralph Agent** failed to resolve this issue automatically.
+            --body "**clanker Agent** failed to resolve this issue automatically.
 
           Check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.
 
           ---
-          *Automated by Ralph Agent*"
+          *Automated by clanker Agent*"

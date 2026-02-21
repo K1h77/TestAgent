@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ralph Agent — Self-Review with auto re-fix loop.
+"""clanker Agent — Self-Review with auto re-fix loop.
 
 Runs a fresh Cline instance to review the code changes, then optionally
 loops back to fix issues. Maximum 3 review iterations. The reviewer is
@@ -41,7 +41,7 @@ logger = logging.getLogger("self-review")
 
 
 def _resolve_repo_root() -> Path:
-    env = os.environ.get("RALPH_REPO_ROOT")
+    env = os.environ.get("clanker_REPO_ROOT")
     if env:
         return Path(env)
     return Path.cwd()

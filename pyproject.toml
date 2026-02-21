@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-clanker-agent  = "clanker.ralph_agent:main"
+clanker-agent  = "clanker.clanker_agent:main"
 clanker-review = "clanker.self_review:main"
 
 [tool.hatch.build.targets.wheel]

@@ -1,10 +1,10 @@
-# Ralph Agent — Flow Diagrams
+# clanker Agent — Flow Diagrams
 
 ## Scope
 
-Ralph is an autonomous GitHub issue resolver. It is triggered by a single label (`clanker-autofix`) and operates entirely within CI — no human intervention required from trigger to PR.
+clanker is an autonomous GitHub issue resolver. It is triggered by a single label (`clanker-autofix`) and operates entirely within CI — no human intervention required from trigger to PR.
 
-**What Ralph does:**
+**What clanker does:**
 
 - Reads a GitHub issue and creates a dedicated branch
 - Drives a Cline CLI coding agent in a TDD loop: write code, run tests, escalate model on failure
@@ -12,7 +12,7 @@ Ralph is an autonomous GitHub issue resolver. It is triggered by a single label 
 - Commits all changes and opens a PR with a cost report and screenshot diff
 - Runs a self-review phase in fresh context: a read-only reviewer Cline inspects the diff and issues a verdict; on rejection, a fixer Cline applies corrections and the cycle repeats
 
-**What Ralph does not do:**
+**What clanker does not do:**
 
 - Does not handle issues without the `clanker-autofix` label
 - Does not push directly to `main` — all changes land in a PR for human merge
@@ -34,12 +34,12 @@ Ralph is an autonomous GitHub issue resolver. It is triggered by a single label 
 
 
 
-## Phase 1: `ralph_agent.py` — Main Coding Agent
+## Phase 1: `clanker_agent.py` — Main Coding Agent
 
 ```mermaid
 flowchart TD
     A([Start]) --> B[Parse issue env vars\nValidate OPENROUTER_API_KEY]
-    B --> C[Create git branch\nralph/issue-N-slug]
+    B --> C[Create git branch\nclanker/issue-N-slug]
     C --> D[Post start comment\non GitHub issue]
     D --> E{Issue has\n'hard' label?}
     E -- Yes --> F[Configure hard_cline\nfor all attempts]
@@ -148,7 +148,7 @@ flowchart TD
 flowchart TD
     A([Issue labeled\n'clanker-autofix'\nOR workflow_dispatch]) --> B{Label is\n'clanker-autofix'\nor manual trigger?}
     B -- No --> C([Skip — do nothing])
-    B -- Yes --> D[Concurrency lock\nralph-autofix-ISSUE_N\nnon-cancelling]
+    B -- Yes --> D[Concurrency lock\nclanker-autofix-ISSUE_N\nnon-cancelling]
 
     D --> E[Checkout main\nfetch-depth: 0]
     E --> F[Setup Node 22\n+ npm cache]
@@ -169,7 +169,7 @@ flowchart TD
     Q --> R[Run agent unit tests\npytest .github/scripts/tests/]
     R --> S{Tests pass?}
     S -- No --> FAIL
-    S -- Yes --> T[Run ralph_agent.py\nstep id: agent]
+    S -- Yes --> T[Run clanker_agent.py\nstep id: agent]
     T --> U[Remove .cline-agent*\n.cline-vision* dirs\nalways runs]
     U --> V[Upload screenshots artifact\nif-no-files-found: ignore\nalways runs]
     V --> W{agent step\noutcome == success?}
@@ -188,14 +188,14 @@ flowchart TD
 ```mermaid
 flowchart LR
     subgraph TRIGGER["GitHub Event"]
-        A([Issue labeled\nralph-autofix])
+        A([Issue labeled\nclanker-autofix])
     end
 
     subgraph CI["clanker-autofix.yml (ubuntu-latest, 90 min)"]
         B[Environment Setup\nNode 22 · Python 3.12\nCline · Playwright]
         C[Validate API Key\nSyntax check + pytest]
 
-        subgraph AGENT["ralph_agent.py"]
+        subgraph AGENT["clanker_agent.py"]
             D[Parse issue\nCreate branch]
             E{Frontend?}
             E -- Yes --> F[Start server\nInit vision Cline]

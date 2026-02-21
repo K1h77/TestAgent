@@ -4,7 +4,7 @@ from clanker.lib.logging_config import format_summary, format_review_summary
 class TestFormatSummary:
     def test_started_status(self):
         result = format_summary({"status": "started", "issue_number": 7})
-        assert "Ralph Agent" in result
+        assert "clanker Agent" in result
         assert "#7" in result
         assert "working on" in result.lower()
 
@@ -78,4 +78,4 @@ class TestFormatReviewSummary:
 
     def test_contains_automated_footer(self):
         result = format_review_summary("ok", "PASSED")
-        assert "Ralph Agent" in result
+        assert "clanker Agent" in result

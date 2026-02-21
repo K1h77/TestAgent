@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Ralph Agent** — an autonomous GitHub issue resolution system. When an issue is labeled `clanker-autofix`, it reads the issue, creates a branch, drives Cline CLI through a TDD loop, takes before/after screenshots (for frontend issues), commits changes, opens a PR, and runs a self-review cycle.
+**clanker Agent** — an autonomous GitHub issue resolution system. When an issue is labeled `clanker-autofix`, it reads the issue, creates a branch, drives Cline CLI through a TDD loop, takes before/after screenshots (for frontend issues), commits changes, opens a PR, and runs a self-review cycle.
 
 Everything outside `.github/` is a **placeholder testbed** (simple Node.js/Express task manager) used to test the agent. The real code lives in `.github/`.
 
@@ -46,7 +46,7 @@ pip install -r requirements.txt   # aider-chat, pytest>=8.0, pyyaml>=6.0
 
 The pipeline has two phases, each a separate Python entry point:
 
-1. **`ralph_agent.py`** — Main orchestration: parse issue → create branch → TDD coding loop (up to `max_coding_attempts` retries) → screenshots (frontend only) → commit/push → create PR
+1. **`clanker_agent.py`** — Main orchestration: parse issue → create branch → TDD coding loop (up to `max_coding_attempts` retries) → screenshots (frontend only) → commit/push → create PR
 2. **`self_review.py`** — Self-review: fresh read-only Cline reviewer → parse verdict (`LGTM` / `NEEDS CHANGES`) → if rejected, fixer Cline + self-heal loop → re-review (up to `max_review_iterations`)
 
 ### Library modules (`.github/scripts/lib/`)
@@ -72,7 +72,7 @@ The pipeline has two phases, each a separate Python entry point:
 ### CI/CD (`.github/workflows/`)
 
 - **`clanker-dispatch.yml`** — Triggered by `issues: [labeled]`. If label is `clanker-autofix`, removes it (prevents re-trigger) and dispatches the main workflow.
-- **`clanker-autofix.yml`** — `workflow_dispatch` on `ubuntu-latest`, 90-minute timeout. Requires `OPENROUTER_API_KEY` secret. Steps: checkout → setup Node 22 + Python 3.12 → install deps → validate API key → syntax-check + pytest → run `ralph_agent.py` → scrub secrets → upload screenshots → run `self_review.py`.
+- **`clanker-autofix.yml`** — `workflow_dispatch` on `ubuntu-latest`, 90-minute timeout. Requires `OPENROUTER_API_KEY` secret. Steps: checkout → setup Node 22 + Python 3.12 → install deps → validate API key → syntax-check + pytest → run `clanker_agent.py` → scrub secrets → upload screenshots → run `self_review.py`.
 
 ### Models (via OpenRouter, not Anthropic direct)
 
@@ -86,4 +86,4 @@ Configured in `agent_config.yml`: `coding` and `fixer` use DeepSeek, `coding_pla
 | `ISSUE_NUMBER`, `ISSUE_TITLE`, `ISSUE_BODY` | GitHub issue metadata |
 | `ISSUE_LABELS` | Comma-separated labels (optional, enables frontend gating) |
 | `GITHUB_TOKEN` | For `gh` CLI operations (auto-set in CI) |
-| `PR_NUMBER`, `BRANCH` | Required by `self_review.py` (output from `ralph_agent.py` step) |
+| `PR_NUMBER`, `BRANCH` | Required by `self_review.py` (output from `clanker_agent.py` step) |

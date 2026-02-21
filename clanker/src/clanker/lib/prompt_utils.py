@@ -11,10 +11,10 @@ from pathlib import Path
 def get_default_prompts_dir() -> Path:
     """Return the bundled prompts directory.
 
-    Checks RALPH_PROMPTS_DIR env var first, then falls back to the
+    Checks clanker_PROMPTS_DIR env var first, then falls back to the
     prompts/ directory bundled with the clanker package.
     """
-    env = os.environ.get("RALPH_PROMPTS_DIR")
+    env = os.environ.get("clanker_PROMPTS_DIR")
     if env:
         return Path(env)
     return Path(__file__).resolve().parent.parent / "prompts"

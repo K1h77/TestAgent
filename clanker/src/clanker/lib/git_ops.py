@@ -79,7 +79,7 @@ def _run_gh(args: list[str]) -> subprocess.CompletedProcess:
 
 
 def configure_git_user(
-    name: str = "Ralph Bot", email: str = "clanker-bot@users.noreply.github.com"
+    name: str = "clanker Bot", email: str = "clanker-bot@users.noreply.github.com"
 ) -> None:
     """Configure git user for commits.
 

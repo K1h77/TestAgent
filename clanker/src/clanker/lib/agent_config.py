@@ -74,10 +74,10 @@ class AgentConfig(BaseModel):
 
 
 def _resolve_config_path() -> Path:
-    env = os.environ.get("RALPH_CONFIG_PATH")
+    env = os.environ.get("clanker_CONFIG_PATH")
     if env:
         return Path(env)
-    repo_root = Path(os.environ.get("RALPH_REPO_ROOT") or Path.cwd())
+    repo_root = Path(os.environ.get("clanker_REPO_ROOT") or Path.cwd())
     candidate = repo_root / ".github" / "agent_config.yml"
     if candidate.exists():
         return candidate
